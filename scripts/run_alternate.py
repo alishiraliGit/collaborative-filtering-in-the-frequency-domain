@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 from app.utils.data_handler import get_edge_list_from_file, map_ids, get_rating_mat
 from app.models.vandermonde import Vandermonde
@@ -18,22 +19,22 @@ if __name__ == '__main__':
     settings = {}
 
     # General settings
-    do_plot = True
+    do_plot = False
     settings['method'] = 'kmeans_approx'
 
     # Load settings
-    load_path = '../data/ml-100k'
+    load_path = os.path.join('..', 'data', 'ml-100k')
     file_name_tr = 'u3.base'
     file_name_te = 'u3.test'
-    save_path = '../results'
+    save_path = os.path.join('..', 'results')
 
     # Vandermonde settings
     settings['dim_x'] = 3
     settings['m'] = 8
-    settings['l2_lambda_ratio'] = 0.001
+    settings['l2_lambda_ratio'] = 0.01
 
     # Clustering settings
-    settings['n_cluster'] = 12
+    settings['n_cluster'] = 5
     settings['cls_init_std'] = 0.1
 
     # Updater settings
@@ -96,7 +97,3 @@ if __name__ == '__main__':
 
     # ------- Save the results -------
     logger.save()
-
-
-
-

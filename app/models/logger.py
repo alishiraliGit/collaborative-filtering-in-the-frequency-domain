@@ -1,6 +1,7 @@
 from datetime import datetime
 import pickle
 from matplotlib import pyplot as plt
+import os
 
 
 class Logger:
@@ -32,7 +33,7 @@ class Logger:
             if isinstance(val, int):
                 stringified += str(val)
             elif isinstance(val, float):
-                stringified += '%.3f' % val
+                stringified += '%.0e' % val
             elif isinstance(val, str):
                 stringified += val
             else:
@@ -40,12 +41,12 @@ class Logger:
 
         file_name = stringified + '-' + datetime.now().strftime('%Y-%m-%d %H-%M-%S')
 
-        with open(self.save_path + '/' + file_name + '.res', 'wb') as f:
+        with open(os.path.join(self.save_path, file_name + '.res'), 'wb') as f:
             pickle.dump({'rmse_tr': self.rmse_tr,
                          'rmse_te': self.rmse_te,
                          'settings': self.settings}, f)
 
     @staticmethod
     def load(load_path, file_name):
-        with open(load_path + '/' + file_name + '.res', 'rb') as f:
+        with open(os.path.join(load_path, file_name + '.res'), 'rb') as f:
             return pickle.load(f)
