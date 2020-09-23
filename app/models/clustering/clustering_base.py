@@ -20,7 +20,7 @@ class Clustering(abc.ABC):
         return self.transform(vm, rating_mat)
 
     @abc.abstractmethod
-    def copy(self):
+    def copy(self, do_init):
         pass
 
     @staticmethod

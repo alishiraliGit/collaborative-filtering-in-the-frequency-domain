@@ -45,5 +45,11 @@ class KMeans(Clustering):
 
         return self.a_c_mat, self.users_clusters
 
-    def copy(self):
-        return KMeans(self.n_cluster, self.a_c_mat.copy(), self.l2_lambda)
+    def copy(self, do_init):
+        if do_init:
+            a_c_mat = np.random.normal(loc=0, scale=np.std(self.a_c_mat), size=self.a_c_mat.shape)
+        else:
+            a_c_mat = self.a_c_mat.copy()
+
+        cls = KMeans(self.n_cluster, a_c_mat, self.l2_lambda)
+        return cls

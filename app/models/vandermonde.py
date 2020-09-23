@@ -70,4 +70,13 @@ class Vandermonde:
         :return: v_mat: [dim_a x n_item]
         """
         self.v_mat = np.cos(np.pi*self.v_mult.dot(x_mat))
+
         return self.v_mat
+
+    def copy(self):
+        vm = Vandermonde(self.dim_x, self.m, self.l2_lambda)
+
+        vm.v_mult = self.v_mult.copy()
+        vm.v_mat = self.v_mat.copy()
+
+        return vm
