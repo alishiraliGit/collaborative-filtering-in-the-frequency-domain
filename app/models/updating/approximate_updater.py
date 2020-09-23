@@ -12,7 +12,7 @@ class ApproximateUpdater(Updater):
         self.gamma = gamma
 
     def fit(self, vm: Vandermonde, a_mat, rating_mat):
-        n_user, n_item = rating_mat.shape
+        _n_user, n_item = rating_mat.shape
 
         # Init.
         x_mat_new = np.zeros(self.x_mat.shape)

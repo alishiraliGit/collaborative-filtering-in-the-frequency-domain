@@ -84,7 +84,7 @@ class LeastSquare(Updater):
 
         deriv_vec = vectorize(deriv, 'F').reshape((1, -1), 'F')
 
-        return csr_matrix(deriv_vec)
+        return deriv_vec
 
     @staticmethod
     def jac(x_vec, vm: Vandermonde, a_mat, rating_mat):
@@ -124,4 +124,4 @@ class LeastSquare(Updater):
 
             deriv[range(n_s), i_s + dim*n_item] = deriv_d
 
-        return deriv
+        return csr_matrix(deriv)

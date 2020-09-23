@@ -8,6 +8,7 @@ from app.models.clustering.kmeans import KMeans
 from app.models.clustering.boosting import Boosting
 from app.models.updating.approximate_updater import ApproximateUpdater
 from app.models.updating.least_square import LeastSquare
+from app.models.updating.randomizer import Randomizer
 from app.models.logger import Logger
 
 
@@ -96,8 +97,8 @@ def get_kmeans_ls_settings():
     sett['method'] = method
 
     # Vandermonde settings
-    sett['dim_x'] = 3
-    sett['m'] = 4
+    sett['dim_x'] = 2
+    sett['m'] = 5
     sett['l2_lambda_ratio'] = 0.01
 
     # Clustering settings
@@ -144,9 +145,9 @@ if __name__ == '__main__':
     # ------- Load data -------
     rating_mat_tr, rating_mat_te, n_user, n_item = load_data(load_path, file_name_tr, file_name_te)
 
-    n_item = 300
-    rating_mat_tr = rating_mat_tr[:, :n_item]
-    rating_mat_te = rating_mat_te[:, :n_item]
+    # n_item = 300
+    # rating_mat_tr = rating_mat_tr[:, :n_item]
+    # rating_mat_te = rating_mat_te[:, :n_item]
     #
 
     # ------- Initialization -------
