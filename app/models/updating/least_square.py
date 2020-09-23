@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.optimize import least_squares
+from scipy.sparse import csr_matrix
 
 from app.models.vandermonde import Vandermonde
 from app.models.updating.updater_base import Updater
@@ -7,10 +8,11 @@ from app.utils.mat_ops import vectorize, unvectorize
 
 
 class LeastSquare(Updater):
-    def __init__(self, x_mat_0):
+    def __init__(self, x_mat_0, max_nfev):
         Updater.__init__(self)
 
         self.x_mat = x_mat_0  # [dim_x x n_item]
+        self.max_nfev = max_nfev
 
     def fit(self, vm: Vandermonde, a_mat, rating_mat):
         x_0 = vectorize(self.x_mat, 'C')
@@ -20,7 +22,7 @@ class LeastSquare(Updater):
                            args=(vm, a_mat, rating_mat),
                            x0=x_0,
                            bounds=(0, 1),
-                           max_nfev=10,
+                           max_nfev=self.max_nfev,
                            verbose=2)
 
         _n_user, n_item = rating_mat.shape
@@ -82,7 +84,7 @@ class LeastSquare(Updater):
 
         deriv_vec = vectorize(deriv, 'F').reshape((1, -1), 'F')
 
-        return deriv_vec
+        return csr_matrix(deriv_vec)
 
     @staticmethod
     def jac(x_vec, vm: Vandermonde, a_mat, rating_mat):

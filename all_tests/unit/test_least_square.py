@@ -81,8 +81,7 @@ class TestLeastSquare(unittest.TestCase):
 
         der_num = (errs_1 - errs_0) / eps
 
-        self.assertAlmostEqual(0, np.sum((der_num - der[:, 0] -der[:, 1]) ** 2))
-
+        self.assertAlmostEqual(0, np.sum((der_num - der[:, 0] - der[:, 1]) ** 2))
 
 
 if __name__ == '__main__':

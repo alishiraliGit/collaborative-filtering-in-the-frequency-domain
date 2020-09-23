@@ -105,6 +105,7 @@ def get_kmeans_ls_settings():
     sett['cls_init_std'] = 0.1
 
     # Updater settings
+    sett['max_nfev'] = 5
 
     # Estimate regularization coefficients
     sett['l2_lambda'] = estimate_l2_lambda(ratio=sett['l2_lambda_ratio'],
@@ -143,9 +144,9 @@ if __name__ == '__main__':
     # ------- Load data -------
     rating_mat_tr, rating_mat_te, n_user, n_item = load_data(load_path, file_name_tr, file_name_te)
 
-    #
-    # rating_mat_tr = rating_mat_tr[:, :n_item]
-    # rating_mat_te = rating_mat_te[:, :n_item]
+    n_item = 300
+    rating_mat_tr = rating_mat_tr[:, :n_item]
+    rating_mat_te = rating_mat_te[:, :n_item]
     #
 
     # ------- Initialization -------
@@ -165,7 +166,8 @@ if __name__ == '__main__':
 
     # approx_upd = ApproximateUpdater(x_mat_0=x_mat_0,
     #                                gamma=settings['gamma'])
-    ls_upd = LeastSquare(x_mat_0=x_mat_0)
+    ls_upd = LeastSquare(x_mat_0=x_mat_0,
+                         max_nfev=settings['max_nfev'])
 
     # Init. boosting
     # boost = Boosting(cls=kmeans,
