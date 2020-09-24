@@ -9,6 +9,7 @@ from app.models.clustering.boosting import Boosting
 from app.models.updating.approximate_updater import ApproximateUpdater
 from app.models.updating.least_square import LeastSquare
 from app.models.updating.randomizer import Randomizer
+from app.models.updating.multi_updater_wrapper import MultiUpdaterWrapper
 from app.models.logger import Logger
 
 
@@ -97,7 +98,7 @@ def get_kmeans_ls_settings():
     sett['method'] = method
 
     # Vandermonde settings
-    sett['dim_x'] = 2
+    sett['dim_x'] = 3
     sett['m'] = 5
     sett['l2_lambda_ratio'] = 0.01
 
@@ -119,10 +120,69 @@ def get_kmeans_ls_settings():
     return sett
 
 
+def get_kmeans_approx_ls_settings():
+    sett = {}
+
+    method = 'kmeans_approx_ls'
+
+    sett['method'] = method
+
+    # Vandermonde settings
+    sett['dim_x'] = 3
+    sett['m'] = 5
+    sett['l2_lambda_ratio'] = 0.01
+
+    # Clustering settings
+    sett['n_cluster'] = 5
+    sett['cls_init_std'] = 0.1
+
+    # Updater settings
+    sett['gamma'] = 0.3
+    sett['max_nfev'] = 5
+
+    # Estimate regularization coefficients
+    sett['l2_lambda'] = estimate_l2_lambda(ratio=sett['l2_lambda_ratio'],
+                                           std_err=1,
+                                           n_eq=8e4 / sett['n_cluster'],
+                                           std_est=sett['cls_init_std'],
+                                           n_est=(sett['m'] + 1) ** sett['dim_x'])
+    sett['l2_lambda_cls'] = 0
+
+    return sett
+
+
+def get_boosted_kmeans_approx_ls_settings():
+    sett = {}
+
+    method = 'boosted_kmeans_approx_ls'
+
+    sett['method'] = method
+
+    # Vandermonde settings
+    sett['dim_x'] = 3
+    sett['m'] = 5
+
+    # Clustering settings
+    sett['n_cluster'] = 2
+    sett['cls_init_std'] = 0.1
+    sett['n_learner'] = 4
+    sett['n_iter_cls'] = 3
+
+    # Updater settings
+    sett['gamma'] = 0.1
+    sett['max_nfev'] = 4
+
+    # Estimate regularization coefficients
+    sett['l2_lambda'] = 0
+    sett['l2_lambda_cls'] = 0
+
+    return sett
+
+
 if __name__ == '__main__':
     # ------- Settings -------
     # Method settings
-    settings = get_kmeans_ls_settings()
+    settings = get_boosted_kmeans_approx_ls_settings()
 
     # General settings
     do_plot = False
@@ -145,11 +205,6 @@ if __name__ == '__main__':
     # ------- Load data -------
     rating_mat_tr, rating_mat_te, n_user, n_item = load_data(load_path, file_name_tr, file_name_te)
 
-    # n_item = 300
-    # rating_mat_tr = rating_mat_tr[:, :n_item]
-    # rating_mat_te = rating_mat_te[:, :n_item]
-    #
-
     # ------- Initialization -------
     #  Init. Vandermonde
     vm = Vandermonde(dim_x=settings['dim_x'],
@@ -160,23 +215,26 @@ if __name__ == '__main__':
     x_mat_0 = np.random.random((settings['dim_x'], n_item))
     a_c_mat_0 = np.random.normal(loc=0, scale=settings['cls_init_std'], size=(vm.dim_a, settings['n_cluster']))
 
-    #  Init. clustering and updater
+    #  Init. clustering
     kmeans = KMeans(n_cluster=settings['n_cluster'],
                     a_c_mat_0=a_c_mat_0,
                     l2_lambda=settings['l2_lambda_cls'])
 
-    # approx_upd = ApproximateUpdater(x_mat_0=x_mat_0,
-    #                                gamma=settings['gamma'])
+    boost = Boosting(cls=kmeans,
+                     n_learner=settings['n_learner'],
+                     n_iter_cls=settings['n_iter_cls'])
+
+    # Init. updaters
+    approx_upd = ApproximateUpdater(x_mat_0=x_mat_0,
+                                    gamma=settings['gamma'])
+
     ls_upd = LeastSquare(x_mat_0=x_mat_0,
                          max_nfev=settings['max_nfev'])
 
-    # Init. boosting
-    # boost = Boosting(cls=kmeans,
-    #                 n_learner=settings['n_learner'],
-    #                 n_iter_cls=settings['n_iter_cls'])
+    multi_upd = MultiUpdaterWrapper(upds=[approx_upd, ls_upd])
 
     # Init. alternate
-    alt = Alternate(cls=kmeans, upd=ls_upd)
+    alt = Alternate(cls=boost, upd=multi_upd)
 
     # Init. logger
     logger = Logger(settings=settings, save_path=save_path, do_plot=do_plot)
