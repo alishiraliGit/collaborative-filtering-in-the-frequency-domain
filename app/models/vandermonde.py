@@ -19,10 +19,10 @@ class Vandermonde:
         return (m + 1) ** dim_x
 
     def get_v_users(self, users, rating_mat):
-        if not isinstance(users, list):  # if users is a number only
+        if not isinstance(users, (list, np.ndarray)):  # if users is a number only
             users = [users]
 
-        observed_indices = np.argwhere(~np.isnan(rating_mat[users]))  # order='C'
+        observed_indices = np.argwhere(~np.isnan(rating_mat[users, :]))  # order='C'
         return self.v_mat[:, observed_indices[:, 1]]
 
     def calc_a_users(self, users, rating_mat):

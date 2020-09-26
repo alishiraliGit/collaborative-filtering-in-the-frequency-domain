@@ -12,6 +12,7 @@ class Alternate:
         self.upd = upd
 
     def run(self, vm: Vandermonde, rating_mat_tr, rating_mat_te, n_iter, min_val, max_val, logger: Logger=None):
+        a_mat = None
         for it in range(n_iter):
             # Do clustering
             a_c_mat, users_clusters = self.cls.fit_transform(vm, rating_mat_tr)
@@ -26,7 +27,9 @@ class Alternate:
             rmse_te = self.calc_prediction_rmse(vm, a_mat, rating_mat_te, min_val, max_val)
 
             if isinstance(logger, Logger):
-                logger.log(rmse_tr, rmse_te)
+                logger.log(rmse_tr, np.nan, rmse_te)
+
+        return a_mat
 
     @staticmethod
     def calc_prediction_rmse(vm: Vandermonde, a_mat, rating_mat_te, min_val, max_val):
