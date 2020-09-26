@@ -23,6 +23,8 @@ class LeastSquare(Updater):
                            x0=x_0,
                            bounds=(0, 1),
                            max_nfev=self.max_nfev,
+                           tr_solver='lsmr',
+                           loss='soft_l1',
                            verbose=2)
 
         _n_user, n_item = rating_mat.shape

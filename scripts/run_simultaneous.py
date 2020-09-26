@@ -14,9 +14,12 @@ from app.models.updating.multi_updater_wrapper import MultiUpdaterWrapper
 from app.models.logger import Logger
 
 
-def calc_rmse(y_predict, y_g_truth):
+def calc_rmse(y_predict, y_g_truth, min_val, max_val):
+    y_predict_copy = y_predict.copy()
+    y_predict_copy[y_predict_copy > max_val] = max_val
+    y_predict_copy[y_predict_copy < min_val] = min_val
 
-    return np.sqrt(np.mean((y_predict - y_g_truth)**2))
+    return np.sqrt(np.mean((y_predict_copy - y_g_truth)**2))
 
 
 def calc_row_mean_matrix(mat):
@@ -108,7 +111,7 @@ def get_boosted_kmeans_approx_settings():
     sett['n_iter_cls'] = 3
 
     # Updater settings
-    sett['gamma'] = 0.1
+    sett['gamma'] = 1
 
     # Estimate regularization coefficients
     sett['l2_lambda'] = 0
@@ -131,7 +134,7 @@ def get_boosted_kmeans_approx_ls_settings():
     # Clustering settings
     sett['n_cluster'] = 2
     sett['cls_init_std'] = 0.1
-    sett['n_learner'] = 3
+    sett['n_learner'] = 4
     sett['n_iter_cls'] = 3
 
     # Updater settings
@@ -166,8 +169,8 @@ if __name__ == '__main__':
     validation_split = 1/16
 
     # Alternation settings
-    n_alter = 2
-    n_iter = 20
+    n_alter = 4
+    n_iter = 10
 
     # ------- Load data -------
     rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item =\
@@ -268,11 +271,11 @@ if __name__ == '__main__':
 
         # ------- Do alternations -------
         print('--- Alternating for user-based method: ---')
-        a_mat_u_res = alt_u.run(vm_u, rating_mat_tr_u_res, rating_mat_va_u_res, n_alter, min_value, max_value,
+        a_mat_u_res = alt_u.run(vm_u, rating_mat_tr_u_res, rating_mat_va_u_res, n_alter, -np.inf, np.inf,
                                 logger=logger_u)
 
         print('--- Alternating for item-based method: ---')
-        a_mat_i_res = alt_i.run(vm_i, rating_mat_tr_i_res, rating_mat_va_i_res, n_alter, min_value, max_value,
+        a_mat_i_res = alt_i.run(vm_i, rating_mat_tr_i_res, rating_mat_va_i_res, n_alter, -np.inf, np.inf,
                                 logger=logger_i)
 
         # ------- Do regression -------
@@ -294,9 +297,9 @@ if __name__ == '__main__':
         y_va_pr += y_va_pr_res
         y_te_pr += y_te_pr_res
 
-        rmse_tr = calc_rmse(y_tr_pr, rating_mat_tr[mask_tr])
-        rmse_va = calc_rmse(y_va_pr, rating_mat_va[mask_va])
-        rmse_te = calc_rmse(y_te_pr, rating_mat_te[mask_te])
+        rmse_tr = calc_rmse(y_tr_pr, rating_mat_tr[mask_tr], min_value, max_value)
+        rmse_va = calc_rmse(y_va_pr, rating_mat_va[mask_va], min_value, max_value)
+        rmse_te = calc_rmse(y_te_pr, rating_mat_te[mask_te], min_value, max_value)
 
         print('---------------- Combined: ----------------')
         logger.log(rmse_tr, rmse_va, rmse_te)
