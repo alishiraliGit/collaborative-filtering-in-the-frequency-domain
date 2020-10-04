@@ -1,9 +1,8 @@
 import numpy as np
 import os
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
 
-from app.utils.data_handler import get_edge_list_from_file, map_ids, get_rating_mat
+from app.utils.data_handler import load_dataset
 from app.models.vandermonde import Vandermonde
 from core.alternate import Alternate
 from app.models.clustering.kmeans import KMeans
@@ -49,23 +48,6 @@ def fit_reg(v_m_u, a_m_u, mean_u, v_m_i, a_m_i, mean_i, rat_mat):
 
 def estimate_l2_lambda(ratio, std_err, n_eq, std_est, n_est):
     return ratio * (std_err*n_eq) / (n_est*std_est)
-
-
-def load_data(loadpath, filename_tr, filename_te, va_split):
-    edges_notmapped_tr_va = get_edge_list_from_file(loadpath, filename_tr)
-    edges_notmapped_te = get_edge_list_from_file(loadpath, filename_te)
-
-    edges, map_u, map_i, num_user, num_item = map_ids(edges_notmapped_tr_va + edges_notmapped_te)
-
-    edges_tr_va = edges[:len(edges_notmapped_tr_va)]
-    edges_tr, edges_va = train_test_split(edges_tr_va, test_size=va_split)
-    edges_te = edges[len(edges_notmapped_tr_va):]
-
-    rat_mat_tr = get_rating_mat(edges_tr, num_user, num_item)
-    rat_mat_va = get_rating_mat(edges_va, num_user, num_item)
-    rat_mat_te = get_rating_mat(edges_te, num_user, num_item)
-
-    return rat_mat_tr, rat_mat_va, rat_mat_te, num_user, num_item
 
 
 def get_kmeans_approx_settings():
@@ -152,21 +134,22 @@ if __name__ == '__main__':
     # ------- Settings -------
     # Method settings
     settings_u = get_boosted_kmeans_approx_ls_settings()
+    settings_u['method'] += '_user_based'
     settings_i = get_boosted_kmeans_approx_ls_settings()
+    settings_i['method'] += '_item_based'
 
     # General settings
     do_plot = False
 
     # Load settings
     load_path = os.path.join('..', 'data', 'ml-100k')
-    file_name_tr = 'u5.base'
-    file_name_te = 'u5.test'
     save_path = os.path.join('..', 'results')
 
     # Dataset settings
-    min_value = -np.inf  # 1
-    max_value = np.inf  # 5
-    validation_split = 1/16
+    min_value = 1
+    max_value = 5
+    validation_split = 0.05/0.80
+    # test_split = 0.05
 
     # Alternation settings
     n_alter = 4
@@ -174,7 +157,7 @@ if __name__ == '__main__':
 
     # ------- Load data -------
     rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item =\
-        load_data(load_path, file_name_tr, file_name_te, validation_split)
+        load_dataset(load_path, 'ml-100k', part=5, va_split=validation_split)
 
     # Init. logger
     logger_u = Logger(settings=settings_u, save_path=save_path, do_plot=do_plot)
@@ -289,9 +272,9 @@ if __name__ == '__main__':
                                      vm_i, a_mat_i_res, mean_mat_i_res,
                                      rating_mat_va_res)
 
-        y_tr_pr_res = reg.predict(x_ui_tr)
-        y_va_pr_res = reg.predict(x_ui_va)
-        y_te_pr_res = reg.predict(x_ui_te)
+        y_tr_pr_res = reg.predict(X=x_ui_tr)
+        y_va_pr_res = reg.predict(X=x_ui_va)
+        y_te_pr_res = reg.predict(X=x_ui_te)
 
         y_tr_pr += y_tr_pr_res
         y_va_pr += y_va_pr_res
@@ -328,3 +311,5 @@ if __name__ == '__main__':
 
     # ------- Save the results -------
     logger.save()
+    logger_u.save()
+    logger_i.save()

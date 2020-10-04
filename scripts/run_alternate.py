@@ -1,7 +1,7 @@
 import numpy as np
 import os
 
-from app.utils.data_handler import get_edge_list_from_file, map_ids, get_rating_mat
+from app.utils.data_handler import get_edge_list_from_file_ml100k, map_ids, get_rating_mat
 from app.models.vandermonde import Vandermonde
 from core.alternate import Alternate
 from app.models.clustering.kmeans import KMeans
@@ -18,8 +18,8 @@ def estimate_l2_lambda(ratio, std_err, n_eq, std_est, n_est):
 
 
 def load_data(loadpath, filename_tr, filename_te):
-    edges_notmapped_tr = get_edge_list_from_file(loadpath, filename_tr)
-    edges_notmapped_te = get_edge_list_from_file(loadpath, filename_te)
+    edges_notmapped_tr = get_edge_list_from_file_ml100k(loadpath, filename_tr)
+    edges_notmapped_te = get_edge_list_from_file_ml100k(loadpath, filename_te)
 
     edges, map_u, map_i, num_user, num_item = map_ids(edges_notmapped_tr + edges_notmapped_te)
     edges_tr = edges[:len(edges_notmapped_tr)]
