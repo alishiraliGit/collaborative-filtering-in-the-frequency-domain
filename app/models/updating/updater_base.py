@@ -17,4 +17,3 @@ class Updater(abc.ABC):
         self.fit(vm, a_mat, rating_mat)
 
         return self.transform(vm)
-

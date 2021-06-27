@@ -26,9 +26,12 @@ class Logger:
             plt.plot(len(self.rmse_tr), self.rmse_tr[-1], 'ro')
             plt.plot(len(self.rmse_va), self.rmse_va[-1], 'ko')
             plt.plot(len(self.rmse_te), self.rmse_te[-1], 'bo')
+            plt.legend(['train', 'validation', 'test'])
+            plt.ylabel('rmse')
+            plt.xlabel('#iter')
             plt.pause(0.05)
 
-    def save(self):
+    def save(self, ext=None):
         stringified = 'result' + Logger.stringify(self.settings)
 
         file_name = stringified + '-' + datetime.now().strftime('%Y-%m-%d %H-%M-%S')
@@ -39,9 +42,19 @@ class Logger:
                          'rmse_te': self.rmse_te,
                          'settings': self.settings}, f)
 
+        if ext is not None:
+            with open(os.path.join(self.save_path, file_name + '.extres'), 'wb') as f:
+                pickle.dump(ext, f)
+
     @staticmethod
-    def load(load_path, file_name):
-        with open(os.path.join(load_path, file_name + '.res'), 'rb') as f:
+    def load(load_path, file_name, load_ext=False):
+        file_path = os.path.join(load_path, file_name)
+        if load_ext:
+            file_path += '.extres'
+        else:
+            file_path += '.res'
+
+        with open(file_path, 'rb') as f:
             return pickle.load(f)
 
     @staticmethod

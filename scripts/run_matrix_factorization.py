@@ -2,118 +2,98 @@ import numpy as np
 import os
 
 from app.utils.data_handler import load_dataset
-from app.models.vandermonde import Vandermonde
-from core.alternate import Alternate
-from app.models.clustering.one_user_one_cluster import OneUserOneCluster
-from app.models.updating.approximate_updater import ApproximateUpdater
-from app.models.updating.least_square import LeastSquare
-from app.models.updating.randomizer import Randomizer
-from app.models.updating.multi_updater_wrapper import MultiUpdaterWrapper
 from app.models.logger import Logger
+from app.models.matrixfactorization.mf import MatrixFactorization
 
 
-def estimate_l2_lambda(ratio, std_err, n_eq, std_est, n_est):
-    return ratio * (std_err*n_eq) / (n_est*std_est)
-
-
-def get_ls_settings():
+def get_als_settings():
     sett = {}
 
-    method = 'ls'
+    method = 'als'
 
     sett['method'] = method
 
-    # Vandermonde settings
-    sett['dim_x'] = 2
-    sett['m'] = 4
+    # Hidden dim
+    sett['dim'] = 3
 
-    # Clustering settings
-    sett['cls_init_std'] = 0.1
+    # Weight init. std
+    sett['w_init_std'] = 0.1
 
-    # Updater settings
-    sett['gamma'] = 0.1
-    sett['max_nfev'] = 10
-
-    # Estimate regularization coefficients
-    sett['l2_lambda'] = 10
+    # Regularization coefficients
+    sett['l2_lambda'] = 1
 
     return sett
 
 
 if __name__ == '__main__':
+    print('---- Started! ----')
+
     # ------- Settings -------
     # Method settings
-    settings = get_ls_settings()
+    settings = get_als_settings()
 
     # General
     do_plot = True
 
     # Path
-    load_path = os.path.join('..', 'data', 'jester')
+    load_path = os.path.join('..', 'data', 'ml-100k')
 
     save_path = os.path.join('..', 'results')
     os.makedirs(save_path, exist_ok=True)
 
     # Dataset
-    dataset_name = 'jester'
-    min_value = -10
-    max_value = 10
+    dataset_name = 'ml-100k'
+    min_value = 1
+    max_value = 5
+    part = 5
 
     # Cross-validation
     test_split = 0.1
-    val_split = 0.1
+    val_split = 0.01/(1 - test_split)
 
     # Item-based or user-based
-    do_transpose = True
+    do_transpose = False
 
     # Alternation
-    n_alter = 100
+    n_alter = 20
 
     # ------- Load data -------
     rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item =\
-        load_dataset(load_path, dataset_name, te_split=test_split, va_split=val_split, do_transpose=do_transpose)
+        load_dataset(load_path, dataset_name, te_split=test_split, va_split=val_split, do_transpose=do_transpose, part=part)
 
     print('Data loaded ...')
 
     # ------- Initialization -------
-    #  Init. Vandermonde
-    vm = Vandermonde(dim_x=settings['dim_x'],
-                     m=settings['m'],
-                     l2_lambda=settings['l2_lambda'])
+    #  Init. "w_u" and "w_i"
+    w_u_0 = np.random.normal(loc=0, scale=settings['w_init_std'], size=(settings['dim'], n_user))
+    w_i_0 = np.random.normal(loc=0, scale=settings['w_init_std'], size=(settings['dim'], n_item))
 
-    #  Init. "x" and "a_c"
-    x_mat_0 = np.random.random((settings['dim_x'], n_item))
-    a_c_mat_0 = np.random.normal(loc=0, scale=settings['cls_init_std'], size=(vm.dim_a, n_user))
-
-    #  Init. clustering
-    one_user_one_cluster = OneUserOneCluster(n_cluster=n_user,
-                                             a_c_mat_0=a_c_mat_0)
-
-    # Init. updaters
-    approx_upd = ApproximateUpdater(x_mat_0=x_mat_0,
-                                    gamma=settings['gamma'])
-
-    ls_upd = LeastSquare(x_mat_0=x_mat_0,
-                         max_nfev=settings['max_nfev'])
-
-    multi_upd = MultiUpdaterWrapper(upds=[approx_upd, ls_upd])
-
-    # Init. alternate
-    alt = Alternate(cls=one_user_one_cluster, upd=multi_upd)
+    # Init. MF
+    mf = MatrixFactorization(w_u_0=w_u_0,
+                             w_i_0=w_i_0,
+                             l2_lambda=settings['l2_lambda'])
 
     # Init. logger
     logger = Logger(settings=settings, save_path=save_path, do_plot=do_plot)
 
     print("Init. done ...")
 
-    # ------- Fit Vandermonde -------
-    vm.fit()
-    vm.transform(x_mat_0)
-
     # ------- Do the alternation -------
-    alt.run(vm, rating_mat_tr, rating_mat_va, n_alter, min_value, max_value,
-            logger=logger,
-            rating_mat_te=rating_mat_te)
+    mf.run(rat_mat_tr=rating_mat_tr,
+           rat_mat_va=rating_mat_va,
+           rat_mat_te=rating_mat_te,
+           n_alt=n_alter,
+           min_val=min_value,
+           max_val=max_value,
+           logger=logger)
 
     # ------- Save the results -------
-    logger.save()
+    logger.save(ext={
+        'w_u': mf.als.w_u,
+        'w_i': mf.als.w_i,
+        'b_u': mf.als.b_u,
+        'b_i': mf.als.b_i,
+        'rating_mat_tr': rating_mat_tr,
+        'rating_mat_va': rating_mat_va,
+        'rating_mat_te': rating_mat_te
+    })

@@ -1,3 +1,4 @@
+tqdm
 appdirs==1.4.4
 appnope==0.1.0
 attrs==19.3.0

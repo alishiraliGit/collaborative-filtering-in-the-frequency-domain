@@ -372,21 +372,23 @@ def plot_all(load_path):
     n_cls_data['nn'] = n_cls_nn_data['ari']
     user_std_data['nn'] = user_std_nn_data['ari']
 
-    plt.figure(figsize=(7, 2.5))
+    plt.figure(figsize=(3, 7))
 
-    plt.subplot(1, 3, 1)
+    plt.subplot(3, 1, 1)
     plot_one(user_std_data, x_label='discriminability', scale='log')
 
-    plt.legend(('K-Rep', 'Boosted K-Rep', 'RECONST-NET'))
+    plt.legend(('k-rep', 'boosted r-rep', 'SmoothRecNet'))
     plt.ylabel('ARI')
 
-    plt.subplot(1, 3, 2)
+    plt.subplot(3, 1, 2)
     plot_one(density_data, x_label='density', scale='log')
+    plt.ylabel('ARI')
 
-    plt.subplot(1, 3, 3)
+    plt.subplot(3, 1, 3)
     plot_one(n_cls_data, x_label='#cluster', scale='linear')
     min_y, max_y = plt.ylim()
     plt.plot([n_cls_data['truth'][0]]*2, [min_y, max_y], 'k--', linewidth=2)
+    plt.ylabel('ARI')
 
 
 if __name__ == '__main__':
@@ -394,4 +396,4 @@ if __name__ == '__main__':
 
     plot_all(save_path)
 
-    plt.savefig(os.path.join(save_path, 'cls', 'demo_clustering' + '.pdf'))
+    plt.savefig(os.path.join(save_path, 'figs', 'demo_clustering.png'))

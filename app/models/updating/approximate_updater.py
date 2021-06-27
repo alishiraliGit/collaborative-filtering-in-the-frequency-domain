@@ -1,4 +1,5 @@
 import numpy as np
+from tqdm import tqdm
 
 from app.models.vandermonde import Vandermonde
 from app.models.updating.updater_base import Updater
@@ -21,7 +22,7 @@ class ApproximateUpdater(Updater):
         rating_mat_pr = vm.predict(a_mat)
 
         # Loop on items
-        for item in range(n_item):
+        for item in tqdm(range(n_item)):
             s_i = rating_mat[:, item:item+1]
 
             observed_users_i = ~np.isnan(s_i[:, 0])

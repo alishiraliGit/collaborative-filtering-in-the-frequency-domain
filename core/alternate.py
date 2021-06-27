@@ -11,7 +11,10 @@ class Alternate:
         self.cls = cls
         self.upd = upd
 
-    def run(self, vm: Vandermonde, rating_mat_tr, rating_mat_te, n_iter, min_val, max_val, logger: Logger=None):
+    def run(self, vm: Vandermonde, rating_mat_tr, rating_mat_va, n_iter, min_val, max_val,
+            rating_mat_te=None,
+            logger: Logger=None):
+
         a_mat = None
         for it in range(n_iter):
             # Do clustering
@@ -22,12 +25,16 @@ class Alternate:
             # Do updating
             self.upd.fit_transform(vm, a_mat, rating_mat_tr)
 
-            # Test rmse
+            # Calc rmse
             rmse_tr = self.calc_prediction_rmse(vm, a_mat, rating_mat_tr, min_val, max_val)
-            rmse_te = self.calc_prediction_rmse(vm, a_mat, rating_mat_te, min_val, max_val)
+            rmse_va = self.calc_prediction_rmse(vm, a_mat, rating_mat_va, min_val, max_val)
+            if rating_mat_te is not None:
+                rmse_te = self.calc_prediction_rmse(vm, a_mat, rating_mat_te, min_val, max_val)
+            else:
+                rmse_te = np.NaN
 
             if isinstance(logger, Logger):
-                logger.log(rmse_tr, np.nan, rmse_te)
+                logger.log(rmse_tr, rmse_va, rmse_te)
 
         return a_mat
 

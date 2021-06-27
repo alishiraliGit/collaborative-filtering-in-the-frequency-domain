@@ -127,3 +127,4 @@ class LeastSquare(Updater):
             deriv[range(n_s), i_s + dim*n_item] = deriv_d
 
         return csr_matrix(deriv)
+

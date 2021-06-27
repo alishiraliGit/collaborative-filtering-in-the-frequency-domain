@@ -15,22 +15,21 @@ if __name__ == '__main__':
     u_dic = Logger.load(loadpath, u_filename)
     tot_dic = Logger.load(loadpath, tot_filename)
 
-    plt.figure(figsize=(4.5, 3))
+    plt.figure(figsize=(4.5, 4))
 
     plt.plot(u_dic['rmse_tr'], 'b--', alpha=0.5, linewidth=1.5)
     plt.plot(u_dic['rmse_te'], 'r--', alpha=0.5, linewidth=1.5)
 
-    plt.plot(i_dic['rmse_tr'], 'b.', alpha=0.5, linewidth=1.5)
-    plt.plot(i_dic['rmse_te'], 'r.', alpha=0.5, linewidth=1.5)
+    plt.plot(i_dic['rmse_tr'], 'b.', alpha=1, linewidth=1.5)
+    plt.plot(i_dic['rmse_te'], 'r.', alpha=1, linewidth=1.5)
 
     n_alter = 4
 
-    plt.plot(np.array(range(1, 1 + len(tot_dic['rmse_va'])))*n_alter, np.array(tot_dic['rmse_va']), 'ko', alpha=0.5, linewidth=0.5)
-    plt.plot(np.array(range(1, 1 + len(tot_dic['rmse_te'])))*n_alter, np.array(tot_dic['rmse_te']), 'ks', alpha=1, linewidth=0.5)
+    plt.plot(np.array(range(1, 1 + len(tot_dic['rmse_va'])))*n_alter, np.array(tot_dic['rmse_va']), 'ko', alpha=1, linewidth=0.5)
 
-    plt.legend(('user tr.', 'user va.', 'item tr.', 'item va.', 'va.', 'te.'))
+    plt.legend(('user-based training', 'user-based validation', 'item-based training', 'item-based validation', 'combined validation'))
 
-    plt.xlabel('iter.')
+    plt.xlabel('#iteration')
     plt.ylabel('RMSE')
 
     # plt.yscale('log')
