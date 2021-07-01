@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from scipy.io import loadmat, savemat
 
-from app.models.vandermonde import Vandermonde
+from app.models.vandermonde import Vandermonde, VandermondeType
 from app.models.clustering.kmeans import KMeans
 from app.models.clustering.boosting import Boosting
 from app.utils.mat_ops import get_ari
@@ -13,7 +13,11 @@ from app.utils.plotting import plot_with_conf_interval
 from app.models.logger import Logger
 
 
-# plt.rcParams['font.family'] = 'Times New Roman'
+plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.serif'] = ['Times New Roman'] + plt.rcParams['font.serif']
+
+# ATTENTION!!!!!
+# In this file, k-means corresponds to k-rep in the paper!
 
 
 def get_file_name(savepath, sett):
@@ -38,7 +42,7 @@ def calc_ari(u_clusters_predicted, u_clusters_truth):
 def get_synthetic_data(sett):
     x_mat = np.random.random((sett['dim_x'], sett['n_item']))
 
-    vm = Vandermonde(sett['dim_x'], sett['m'], 0)
+    vm = Vandermonde.get_instance(sett['dim_x'], sett['m'], 0, VandermondeType.COS_MULT)
     vm.fit()
     vm.transform(x_mat)
 
@@ -124,7 +128,7 @@ def get_compatible_boosted_kmeans_settings(sim_sett):
     # Clustering settings
     sett['n_cluster'] = 2
     sett['cls_init_std'] = 0.1
-    sett['n_learner'] = np.round(sim_sett['n_cluster']).astype(int)
+    sett['n_learner'] = np.ceil(np.log2(sim_sett['n_cluster'])).astype(int)
     sett['n_iter_cls'] = 5
 
     # Estimate regularization coefficients
@@ -138,9 +142,10 @@ def run_kmeans(sim_sett, x_mat, rating_mat, l2_lambda=0):
     sett_kmean = get_compatible_kmeans_settings(sim_sett)
 
     # VM
-    vm_kmean = Vandermonde(dim_x=sett_kmean['dim_x'],
-                           m=sett_kmean['m'],
-                           l2_lambda=l2_lambda)
+    vm_kmean = Vandermonde.get_instance(dim_x=sett_kmean['dim_x'],
+                                        m=sett_kmean['m'],
+                                        l2_lambda=l2_lambda,
+                                        vm_type=VandermondeType.COS_MULT)
 
     #  Init. "x" and "a_c"
     x_0 = x_mat.copy()
@@ -167,9 +172,10 @@ def run_boosted_kmeans(sim_sett, x_mat, rating_mat):
     sett_boost = get_compatible_boosted_kmeans_settings(sim_sett)
 
     # VM
-    vm_boost = Vandermonde(dim_x=sett_boost['dim_x'],
-                           m=sett_boost['m'],
-                           l2_lambda=sett_boost['l2_lambda'])
+    vm_boost = Vandermonde.get_instance(dim_x=sett_boost['dim_x'],
+                                        m=sett_boost['m'],
+                                        l2_lambda=sett_boost['l2_lambda'],
+                                        vm_type=VandermondeType.COS_MULT)
 
     # Init. "x" and "a_c"
     x_0 = x_mat.copy()
@@ -359,6 +365,7 @@ def plot_all(load_path):
     n_cls_nn_data = loadmat(os.path.join(load_path, 'cls', 'nn_ari_vs_n_cluster.mat'))
     user_std_nn_data = loadmat(os.path.join(load_path, 'cls', 'nn_ari_vs_user_std.mat'))
 
+    # Old simulations
     density_data = loadmat(os.path.join(load_path, 'cls', 'result-methoddensity-n_user50-n_item200-dim_x2-m3-n_cluster4-cls_init_std1e-01-user_std1e-02-2020-10-01 22-42-09.mat'))
     n_cls_data = loadmat(os.path.join(load_path, 'cls', 'result-methodn_cluster-n_user50-n_item200-density1e-01-dim_x2-m3-cls_init_std1e-01-user_std1e-02-2020-10-01 22-42-29.mat'))
     user_std_data = loadmat(os.path.join(load_path, 'cls', 'result-methoduser_std-n_user50-n_item200-density1e-01-dim_x2-m3-n_cluster4-cls_init_std1e-01-2020-10-01 22-48-38.mat'))
@@ -377,7 +384,7 @@ def plot_all(load_path):
     plt.subplot(3, 1, 1)
     plot_one(user_std_data, x_label='discriminability', scale='log')
 
-    plt.legend(('k-rep', 'boosted r-rep', 'SmoothRecNet'))
+    plt.legend(('k-rep', 'boosted k-rep', 'SmoothRecNet'))
     plt.ylabel('ARI')
 
     plt.subplot(3, 1, 2)
@@ -385,7 +392,7 @@ def plot_all(load_path):
     plt.ylabel('ARI')
 
     plt.subplot(3, 1, 3)
-    plot_one(n_cls_data, x_label='#cluster', scale='linear')
+    plot_one(n_cls_data, x_label='#cluster or #learner', scale='linear')
     min_y, max_y = plt.ylim()
     plt.plot([n_cls_data['truth'][0]]*2, [min_y, max_y], 'k--', linewidth=2)
     plt.ylabel('ARI')
@@ -395,5 +402,6 @@ if __name__ == '__main__':
     save_path = os.path.join('..', 'results')
 
     plot_all(save_path)
+    plt.show()
 
-    plt.savefig(os.path.join(save_path, 'figs', 'demo_clustering.png'))
+    plt.savefig(os.path.join(save_path, 'figs', 'demo_clustering.pdf'))

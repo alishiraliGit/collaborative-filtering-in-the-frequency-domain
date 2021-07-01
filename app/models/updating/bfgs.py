@@ -113,22 +113,65 @@ class BFGS(Updater):
                 deriv[q] = -2 * (v_i.T.dot(a_mat_i) - s_i.T).dot(
                     a_mat_i_re.T.dot(np.sin(np.pi * vm_copy.v_mult.dot(x_i)))
                 )
-            elif vm_copy.vm_type == VandermondeType.TANH:
-                # ToDo
-                min_val, max_val = -10, 10
-                deriv[q] = \
-                    - (
-                            2 * ((max_val - min_val) / 2 * np.tanh(v_i.T.dot(a_mat_i)) + (max_val + min_val) / 2 - s_i.T)
-                            * (max_val - min_val) / 2 * (1 - np.tanh(v_i.T.dot(a_mat_i)) ** 2)
-                    ).dot(a_mat_i_re.T.dot(np.sin(np.pi * vm_copy.v_mult.dot(x_i))))
+            else:
+                raise Exception('Invalid VM type!')
 
         return deriv
 
     @staticmethod
-    def loss_jac_i(x_i_vec, vm_copy: Vandermonde, a_mat, rating_mat, item):
+    def loss_jac_i(x_i_vec, vm_org: Vandermonde, a_mat, rating_mat, item):
 
-        return BFGS.loss_i(x_i_vec, vm_copy, a_mat, rating_mat, item), \
-               BFGS.jac_i(x_i_vec, vm_copy, a_mat, rating_mat, item)
+        loss = BFGS.loss_i(x_i_vec, vm_org, a_mat, rating_mat, item)
+
+        if vm_org.vm_type == VandermondeType.COS_MULT:
+            jac = BFGS.jac_cos_mult_i(x_i_vec, vm_org, a_mat, rating_mat, item)
+        else:
+            jac = BFGS.jac_i(x_i_vec, vm_org, a_mat, rating_mat, item)
+
+        return loss, jac
+
+    @staticmethod
+    def jac_cos_mult_i(x_i_vec, vm_org: Vandermonde, a_mat, rating_mat, item):
+        # Copy vm
+        vm_copy = vm_org.copy()
+
+        # Reshape x to col vec
+        x_i = unvectorize(x_i_vec, 1, 'F')  # [dim_x x 1]
+
+        # Use x_mat in vm
+        vm_copy.transform(x_i)
+
+        v_i = vm_copy.v_mat  # [dim_a x 1]
+
+        # Select rated users
+        rating_mat_i = rating_mat[:, item:(item + 1)]  # [n_user x 1]
+
+        rated_users_i = np.nonzero(~np.isnan(rating_mat_i))[0]
+
+        s_i = rating_mat_i[rated_users_i]  # [n_users_i x 1]
+
+        a_mat_i = a_mat[:, rated_users_i]  # [dim_a x n_users_i]
+
+        # Loop on dim_x
+        dim_x = x_i.shape[0]
+
+        deriv = np.zeros((dim_x,))  # [dim_x,]
+
+        for q in range(dim_x):
+            x_i_q = x_i[q, 0]
+            m_q = vm_copy.v_mult[:, q:(q+1)]
+
+            dh = a_mat_i.T.dot(-v_i * np.pi*m_q * np.tan(np.pi*m_q*x_i_q))
+
+            deriv[q] = 2*(vm_copy.predict(a_mat_i) - s_i).T.dot(dh)
+
+        return deriv
+
+    @staticmethod
+    def loss_jac_cos_mult_i(x_i_vec, vm_org: Vandermonde, a_mat, rating_mat, item):
+
+        return BFGS.loss_i(x_i_vec, vm_org, a_mat, rating_mat, item), \
+               BFGS.jac_cos_mult_i(x_i_vec, vm_org, a_mat, rating_mat, item)
 
     @staticmethod
     def loss_tanh_i(x_i_vec, vm_org: Vandermonde, a_mat, rating_mat, item, min_val, max_val):

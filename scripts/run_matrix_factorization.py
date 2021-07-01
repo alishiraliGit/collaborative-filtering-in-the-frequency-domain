@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.random import default_rng
 import os
 
 from app.utils.data_handler import load_dataset
@@ -14,13 +15,13 @@ def get_als_settings():
     sett['method'] = method
 
     # Hidden dim
-    sett['dim'] = 3
+    sett['dim'] = 2
 
     # Weight init. std
     sett['w_init_std'] = 0.1
 
     # Regularization coefficients
-    sett['l2_lambda'] = 1
+    sett['l2_lambda'] = 0
 
     return sett
 
@@ -36,37 +37,38 @@ if __name__ == '__main__':
     do_plot = True
 
     # Path
-    load_path = os.path.join('..', 'data', 'ml-100k')
+    load_path = os.path.join('..', 'data', 'jester')
 
     save_path = os.path.join('..', 'results')
     os.makedirs(save_path, exist_ok=True)
 
     # Dataset
-    dataset_name = 'ml-100k'
-    min_value = 1
-    max_value = 5
-    part = 5
+    dataset_name = 'jester'
+    min_value = -10
+    max_value = 10
+    # part = 5
 
     # Cross-validation
     test_split = 0.1
-    val_split = 0.01/(1 - test_split)
+    val_split = 0.1/(1 - test_split)
 
     # Item-based or user-based
-    do_transpose = False
+    do_transpose = True
 
     # Alternation
-    n_alter = 20
+    n_alter = 15
 
     # ------- Load data -------
     rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item =\
-        load_dataset(load_path, dataset_name, te_split=test_split, va_split=val_split, do_transpose=do_transpose, part=part)
+        load_dataset(load_path, dataset_name, te_split=test_split, va_split=val_split, do_transpose=do_transpose)
 
     print('Data loaded ...')
 
     # ------- Initialization -------
     #  Init. "w_u" and "w_i"
-    w_u_0 = np.random.normal(loc=0, scale=settings['w_init_std'], size=(settings['dim'], n_user))
-    w_i_0 = np.random.normal(loc=0, scale=settings['w_init_std'], size=(settings['dim'], n_item))
+    rng = default_rng(1)
+    w_u_0 = rng.normal(loc=0, scale=settings['w_init_std'], size=(settings['dim'], n_user))
+    w_i_0 = rng.normal(loc=0, scale=settings['w_init_std'], size=(settings['dim'], n_item))
 
     # Init. MF
     mf = MatrixFactorization(w_u_0=w_u_0,
@@ -76,7 +78,7 @@ if __name__ == '__main__':
     # Init. logger
     logger = Logger(settings=settings, save_path=save_path, do_plot=do_plot)
 
-    print("Init. done ...")
+    print('Init. done ...')
 
     # ------- Do the alternation -------
     mf.run(rat_mat_tr=rating_mat_tr,
@@ -86,6 +88,11 @@ if __name__ == '__main__':
            min_val=min_value,
            max_val=max_value,
            logger=logger)
+
+    # ------- Print the best validated result -------
+    best_iter = np.argmin(logger.rmse_va)
+    print('---> best iter: %d, rmse train: %.3f, rmse val: %.3f rmse test: %.3f' %
+          (int(best_iter), logger.rmse_tr[best_iter], logger.rmse_va[best_iter], logger.rmse_te[best_iter]))
 
     # ------- Save the results -------
     logger.save(ext={

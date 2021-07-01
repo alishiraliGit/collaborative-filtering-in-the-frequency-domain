@@ -7,14 +7,14 @@ from app.utils.mat_ops import vectorize_rows
 class VandermondeType:
     COS = 'cos'
     REAL = 'real'
-    TANH = 'tanh'
+    COS_MULT = 'cos_mult'
 
 
 class Vandermonde(abc.ABC):
     def __init__(self, dim_x, dim_a, m, l2_lambda, vm_type):
         self.dim_x = dim_x
-        self.m = m
         self.dim_a = dim_a
+        self.m = m
         self.l2_lambda = l2_lambda
 
         self.v_mult = None  # [dim_a x dim_x]
@@ -29,8 +29,8 @@ class Vandermonde(abc.ABC):
             return VandermondeCos(dim_x, m, l2_lambda)
         elif vm_type == VandermondeType.REAL:
             return VandermondeReal(dim_x, m, l2_lambda)
-        else:
-            return None
+        elif vm_type == VandermondeType.COS_MULT:
+            return VandermondeCosMult(dim_x, m, l2_lambda)
 
     def get_v_users(self, users, rating_mat):
         if not isinstance(users, (list, np.ndarray)):  # if users is a number only
@@ -68,7 +68,6 @@ class Vandermonde(abc.ABC):
         vm = self.__class__(self.dim_x, self.m, self.l2_lambda)
 
         vm.v_mult = self.v_mult.copy()
-        # vm.v_mat = self.v_mat.copy()
 
         return vm
 
@@ -152,5 +151,53 @@ class VandermondeReal(Vandermonde):
         """
         self.v_mat = np.concatenate((np.cos(np.pi*self.v_mult.dot(x_mat)), np.sin(np.pi*self.v_mult.dot(x_mat))),
                                     axis=0)
+
+        return self.v_mat
+
+
+class VandermondeCosMult(Vandermonde):
+    def __init__(self, dim_x, m, l2_lambda):
+        dim_a = self.__calc_dim_a(dim_x, m)
+        Vandermonde.__init__(self, dim_x, dim_a, m, l2_lambda, vm_type=VandermondeType.COS_MULT)
+
+    @staticmethod
+    def __calc_dim_a(dim_x, m):
+        return (m + 1) ** dim_x
+
+    def fit(self):
+        """
+        sets v_mult, [dim_a x dim_x]
+        :return: None
+        """
+        v_mult_row = np.zeros((self.dim_x,))
+        v_mult = np.zeros((self.dim_a, self.dim_x))
+
+        for i_row in range(1, self.dim_a):
+            v_mult_row[0] += 1
+
+            for i_dim in range(self.dim_x - 1):
+                if v_mult_row[i_dim] >= (self.m + 1):
+                    v_mult_row[i_dim + 1] += v_mult_row[i_dim] // (self.m + 1)
+                    v_mult_row[i_dim] %= (self.m + 1)
+
+            v_mult[i_row, :] = v_mult_row
+
+        self.v_mult = v_mult
+
+        return
+
+    def transform(self, x_mat):
+        """
+        :param x_mat: [dim_x x n_item]
+        :return: v_mat: [dim_a x n_item]
+        """
+        n_item = x_mat.shape[1]
+
+        self.v_mat = np.zeros((self.dim_a, n_item))
+
+        for item in range(n_item):
+            x_i_diag = np.diag(x_mat[:, item])
+
+            self.v_mat[:, item] = np.prod(np.cos(np.pi*self.v_mult.dot(x_i_diag)), axis=1)
 
         return self.v_mat

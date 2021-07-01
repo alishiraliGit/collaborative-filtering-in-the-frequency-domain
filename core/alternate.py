@@ -15,7 +15,7 @@ class Alternate:
             rating_mat_te=None,
             logger: Logger=None):
 
-        a_mat = None
+        a_mat_opt = None
         for it in range(n_iter):
             # Do clustering
             a_c_mat, users_clusters = self.cls.fit_transform(vm, rating_mat_tr)
@@ -36,7 +36,16 @@ class Alternate:
             if isinstance(logger, Logger):
                 logger.log(rmse_tr, rmse_va, rmse_te)
 
-        return a_mat
+                if rmse_va <= np.min(logger.rmse_va):
+                    a_mat_opt = a_mat
+                    print('(this iteration has been optimum till now!)')
+                else:
+                    # ToDo
+                    pass
+            else:
+                a_mat_opt = a_mat
+
+        return a_mat_opt
 
     @staticmethod
     def calc_prediction_rmse(vm: Vandermonde, a_mat, rating_mat_te, min_val, max_val):

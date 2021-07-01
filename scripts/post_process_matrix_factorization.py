@@ -7,7 +7,7 @@ from app.models.matrixfactorization.mf import MatrixFactorization
 from app.utils.plotting import get_2d_grid
 
 
-def plot2d(w_u, w_i, rat_mat, user, max_x, min_val, max_val):
+def plot2d(w_u, w_i, b_u, b_i, rat_mat, user, max_x, min_val, max_val):
     is_rated = np.where(~np.isnan(rat_mat[user]))
 
     plt.figure()
@@ -16,7 +16,8 @@ def plot2d(w_u, w_i, rat_mat, user, max_x, min_val, max_val):
     # Init. a grid
     xy_mat, n, extent = get_2d_grid(max_x)
 
-    rat_pre = MatrixFactorization.predict(w_u[:, user:(user + 1)], xy_mat, min_val, max_val)
+    rat_pre = MatrixFactorization.predict(w_u[:, user:(user + 1)], xy_mat,
+                                          b_u[user], np.zeros((xy_mat.shape[1],)), min_val, max_val)
 
     plt.imshow(rat_pre.reshape((n, n)), cmap='hot', extent=extent, origin='lower')
 
@@ -25,7 +26,7 @@ def plot2d(w_u, w_i, rat_mat, user, max_x, min_val, max_val):
                 edgecolors='k')
 
     # ----- Plot the user's arrow -----
-    plt.annotate('', xy=(w_u[0][user], w_u[1][user]), xytext=(0, 0),
+    plt.annotate('', xy=(w_u[0][user]*2, w_u[1][user]*2), xytext=(0, 0),
                  arrowprops={'arrowstyle': 'fancy', 'facecolor': 'b', 'edgecolor': 'w', 'mutation_scale': 40})
 
 
@@ -44,15 +45,17 @@ if __name__ == '__main__':
     os.makedirs(save_path, exist_ok=True)
 
     # File
-    filename = 'result-methodals-dim2-w_init_std1e-01-l2_lambda1-2021-04-04 01-26-05'
+    # Jester with 8000
+    filename = 'result-methodals-dim2-w_init_std1e-01-l2_lambda0-2021-06-29 18-44-54'
 
     # Dataset
-    min_value = -0.5
-    max_value = 0.5
+    min_value = -10
+    max_value = 10
 
     # Plot
-    max_x_y = 1  # 4.7
-    u = 7
+    max_x_y = 7
+
+    u = 71
 
     # ------- Load model -------
     ext_dic = Logger.load(model_load_path, filename, load_ext=True)
@@ -60,16 +63,17 @@ if __name__ == '__main__':
     print('Model loaded ...')
 
     # ------- Calc. rmse -------
-    cv = 'tr'
+    cv = 'te'
 
-    rating_mat_pr = MatrixFactorization.predict(ext_dic['w_u'], ext_dic['w_i'], min_value, max_value)
+    rating_mat_pr = MatrixFactorization.predict(ext_dic['w_u'], ext_dic['w_i'], ext_dic['b_u'], ext_dic['b_i'],
+                                                min_value, max_value)
 
     rmse = calc_rmse_per_user(ext_dic['rating_mat_' + cv], rating_mat_pr)
 
     print('User %d is selected with rmse = %.3f' % (u, rmse[u]))
 
     # ------- Plot -------
-    plot2d(ext_dic['w_u'], ext_dic['w_i'], ext_dic['rating_mat_' + cv],
+    plot2d(ext_dic['w_u'], ext_dic['w_i'], ext_dic['b_u'], ext_dic['b_i'], ext_dic['rating_mat_' + cv],
            user=u,
            max_x=max_x_y,
            min_val=min_value,
@@ -78,3 +82,4 @@ if __name__ == '__main__':
     plt.colorbar()
 
     plt.savefig(os.path.join(save_path, cv + '_' + filename))
+    plt.savefig(os.path.join(save_path, cv + '_' + filename + '.pdf'))

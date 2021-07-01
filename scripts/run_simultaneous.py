@@ -1,14 +1,15 @@
 import numpy as np
+from numpy.random import default_rng
 import os
 from sklearn.linear_model import LinearRegression
 
 from app.utils.data_handler import load_dataset
-from app.models.vandermonde import Vandermonde
+from app.models.vandermonde import Vandermonde, VandermondeType
 from core.alternate import Alternate
 from app.models.clustering.kmeans import KMeans
 from app.models.clustering.boosting import Boosting
 from app.models.updating.approximate_updater import ApproximateUpdater
-from app.models.updating.least_square import LeastSquare
+from app.models.updating.bfgs import BFGS
 from app.models.updating.multi_updater_wrapper import MultiUpdaterWrapper
 from app.models.logger import Logger
 
@@ -130,40 +131,107 @@ def get_boosted_kmeans_approx_ls_settings():
     return sett
 
 
+def get_kmeans_approx_bfgs_settings():
+    sett = {}
+
+    method = 'kmeans_approx_bfgs'
+
+    sett['method'] = method
+
+    # Vandermonde settings
+    sett['dim_x'] = 2
+    sett['m'] = 3
+    sett['vm_type'] = VandermondeType.COS_MULT
+
+    # Clustering settings
+    sett['n_cluster'] = 3
+    sett['cls_init_std'] = 0.1
+
+    # Updater settings
+    sett['gamma'] = 1
+    sett['max_iter_bfgs'] = 5
+
+    # Regularization coefficients
+    sett['l2_lambda'] = 10
+    sett['l2_lambda_cls'] = 0
+
+    return sett
+
+
+def get_boosted_kmeans_approx_bfgs_settings():
+    sett = {}
+
+    method = 'kmeans_boosted_approx_bfgs'
+
+    sett['method'] = method
+
+    # Vandermonde settings
+    sett['dim_x'] = 3
+    sett['m'] = 4
+    sett['vm_type'] = VandermondeType.COS_MULT
+
+    # Clustering settings
+    sett['n_cluster'] = 2
+    sett['cls_init_std'] = 0.1
+    sett['n_learner'] = 6
+    sett['n_iter_cls'] = 3
+
+    # Updater settings
+    sett['gamma'] = 1
+    sett['max_iter_bfgs'] = 5
+
+    # Regularization coefficients
+    sett['l2_lambda'] = 0
+    sett['l2_lambda_cls'] = 0
+
+    return sett
+
+
 if __name__ == '__main__':
     # ------- Settings -------
-    # Method settings
-    settings_u = get_boosted_kmeans_approx_ls_settings()
+    # Method
+    settings_u = get_boosted_kmeans_approx_bfgs_settings()
     settings_u['method'] += '_user_based'
-    settings_i = get_boosted_kmeans_approx_ls_settings()
+    settings_i = get_boosted_kmeans_approx_bfgs_settings()
     settings_i['method'] += '_item_based'
 
-    # General settings
+    print(settings_u)
+
+    # General
     do_plot = False
 
-    # Load settings
-    load_path = os.path.join('..', 'data', 'ml-100k')
-    save_path = os.path.join('..', 'results')
+    # Path
+    load_path = os.path.join('..', 'data', 'ml-1m')
 
-    # Dataset settings
+    save_path = os.path.join('..', 'results')
+    os.makedirs(save_path, exist_ok=True)
+
+    # Dataset
+    dataset_name = 'ml-1m'
     min_value = 1
     max_value = 5
-    validation_split = 0.05/0.80
-    # test_split = 0.05
+
+    # Cross-validation
+    test_split = 0.05
+    val_split = 0.05/(1 - test_split)
 
     # Alternation settings
-    n_alter = 4
-    n_iter = 10
+    n_iter = 5
 
     # ------- Load data -------
-    rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item =\
-        load_dataset(load_path, 'ml-100k', part=5, va_split=validation_split)
+    rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item = \
+        load_dataset(load_path, dataset_name, te_split=test_split, va_split=val_split, do_transpose=False)
+
+    print('Data loaded ...')
+
+    # ------- Initialization for the big loop -------
+    rng = default_rng(1)
 
     # Init. logger
     logger_u = Logger(settings=settings_u, save_path=save_path, do_plot=do_plot)
     logger_i = Logger(settings=settings_i, save_path=save_path, do_plot=do_plot)
 
-    logger = Logger(settings={'method': settings_u['method']}, save_path=save_path, do_plot=do_plot)
+    logger = Logger(settings={'method': settings_u['method']}, save_path=save_path, do_plot=True)
 
     # Init. for big loop
     rating_mat_tr_res = rating_mat_tr.copy()
@@ -189,24 +257,29 @@ if __name__ == '__main__':
     mask_te = ~np.isnan(rating_mat_te)
 
     for it in range(n_iter):
+        # ToDo
+        if it == 0:
+            n_alter = 8
+        else:
+            n_alter = 3
         # ------- Initialization -------
         #  Init. Vandermonde
-        vm_u = Vandermonde(dim_x=settings_u['dim_x'],
-                           m=settings_u['m'],
-                           l2_lambda=settings_u['l2_lambda'])
+        vm_u = Vandermonde.get_instance(dim_x=settings_u['dim_x'],
+                                        m=settings_u['m'],
+                                        l2_lambda=settings_u['l2_lambda'],
+                                        vm_type=settings_u['vm_type'])
 
-        vm_i = Vandermonde(dim_x=settings_i['dim_x'],
-                           m=settings_i['m'],
-                           l2_lambda=settings_i['l2_lambda'])
+        vm_i = Vandermonde.get_instance(dim_x=settings_i['dim_x'],
+                                        m=settings_i['m'],
+                                        l2_lambda=settings_i['l2_lambda'],
+                                        vm_type=settings_i['vm_type'])
 
         #  Init. "x" and "a_c"
-        x_mat_0_u = np.random.random((settings_u['dim_x'], n_item))
-        x_mat_0_i = np.random.random((settings_i['dim_x'], n_user))
+        x_mat_0_u = rng.random((settings_u['dim_x'], n_item))
+        x_mat_0_i = rng.random((settings_i['dim_x'], n_user))
 
-        a_c_mat_0_u = np.random.normal(loc=0, scale=settings_u['cls_init_std'],
-                                       size=(vm_u.dim_a, settings_u['n_cluster']))
-        a_c_mat_0_i = np.random.normal(loc=0, scale=settings_i['cls_init_std'],
-                                       size=(vm_i.dim_a, settings_i['n_cluster']))
+        a_c_mat_0_u = rng.normal(loc=0, scale=settings_u['cls_init_std'], size=(vm_u.dim_a, settings_u['n_cluster']))
+        a_c_mat_0_i = rng.normal(loc=0, scale=settings_i['cls_init_std'], size=(vm_i.dim_a, settings_i['n_cluster']))
 
         #  Init. clustering
         kmeans_u = KMeans(n_cluster=settings_u['n_cluster'],
@@ -232,14 +305,14 @@ if __name__ == '__main__':
         approx_upd_i = ApproximateUpdater(x_mat_0=x_mat_0_i,
                                           gamma=settings_i['gamma'])
 
-        ls_upd_u = LeastSquare(x_mat_0=x_mat_0_u,
-                               max_nfev=settings_u['max_nfev'])
+        bfgs_upd_u = BFGS(x_mat_0=x_mat_0_u,
+                          max_iter=settings_u['max_iter_bfgs'])
 
-        ls_upd_i = LeastSquare(x_mat_0=x_mat_0_i,
-                               max_nfev=settings_i['max_nfev'])
+        bfgs_upd_i = BFGS(x_mat_0=x_mat_0_i,
+                          max_iter=settings_i['max_iter_bfgs'])
 
-        multi_upd_u = MultiUpdaterWrapper(upds=[approx_upd_u, ls_upd_u])
-        multi_upd_i = MultiUpdaterWrapper(upds=[approx_upd_i, ls_upd_i])
+        multi_upd_u = MultiUpdaterWrapper(upds=[approx_upd_u, bfgs_upd_u])
+        multi_upd_i = MultiUpdaterWrapper(upds=[approx_upd_i, bfgs_upd_i])
 
         # Init. alternates
         alt_u = Alternate(cls=boost_u, upd=multi_upd_u)
@@ -253,13 +326,19 @@ if __name__ == '__main__':
         vm_i.transform(x_mat_0_i)
 
         # ------- Do alternations -------
+        # ToDo
+        logger_u.rmse_va = []
+        logger_i.rmse_va = []
+
         print('--- Alternating for user-based method: ---')
         a_mat_u_res = alt_u.run(vm_u, rating_mat_tr_u_res, rating_mat_va_u_res, n_alter, -np.inf, np.inf,
-                                logger=logger_u)
+                                logger=logger_u,
+                                rating_mat_te=rating_mat_te_u_res)
 
         print('--- Alternating for item-based method: ---')
         a_mat_i_res = alt_i.run(vm_i, rating_mat_tr_i_res, rating_mat_va_i_res, n_alter, -np.inf, np.inf,
-                                logger=logger_i)
+                                logger=logger_i,
+                                rating_mat_te=rating_mat_te_i_res)
 
         # ------- Do regression -------
         _, x_ui_tr, y_tr = fit_reg(vm_u, a_mat_u_res, mean_mat_u_res,

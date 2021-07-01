@@ -7,7 +7,6 @@ from app.models.vandermonde import Vandermonde, VandermondeType
 from core.alternate import Alternate
 from app.models.clustering.one_user_one_cluster import OneUserOneCluster
 from app.models.updating.approximate_updater import ApproximateUpdater
-from app.models.updating.least_square import LeastSquare
 from app.models.updating.bfgs import BFGS
 from app.models.updating.multi_updater_wrapper import MultiUpdaterWrapper
 from app.models.logger import Logger
@@ -26,8 +25,8 @@ def get_bfgs_settings():
 
     # Vandermonde settings
     sett['dim_x'] = 2
-    sett['m'] = 6
-    sett['vm_type'] = VandermondeType.COS
+    sett['m'] = 2
+    sett['vm_type'] = VandermondeType.COS_MULT
 
     # Clustering settings
     sett['cls_init_std'] = 0.1
@@ -36,8 +35,8 @@ def get_bfgs_settings():
     sett['gamma'] = 1  # default: 1
     sett['max_iter'] = 5  # default: 5
 
-    # Estimate regularization coefficients
-    sett['l2_lambda'] = 1000  # default: 1000
+    # Regularization coefficients
+    sett['l2_lambda'] = 100  # default: 1000
 
     return sett
 
@@ -60,15 +59,15 @@ if __name__ == '__main__':
     init_load_path = os.path.join('..', 'results')
 
     # Path
-    load_path = os.path.join('..', 'data', 'monday_offers')
+    load_path = os.path.join('..', 'data', 'jester')
 
     save_path = os.path.join('..', 'results')
     os.makedirs(save_path, exist_ok=True)
 
     # Dataset
-    dataset_name = 'monday_offers'
-    min_value = -0.5
-    max_value = 0.5
+    dataset_name = 'jester'
+    min_value = -10
+    max_value = 10
 
     # Cross-validation
     test_split = 0.1
@@ -78,7 +77,7 @@ if __name__ == '__main__':
     do_transpose = True
 
     # Alternation
-    n_alter = 8
+    n_alter = 20
 
     # ------- Load data -------
     rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item =\
@@ -107,7 +106,7 @@ if __name__ == '__main__':
         x_mat_0 = (x_mat_0 - min_x_0) / (max_x_0 - min_x_0)
 
     else:
-        x_mat_0 = rng.random((settings['dim_x'], n_item), )
+        x_mat_0 = rng.random((settings['dim_x'], n_item))
 
     a_c_mat_0 = rng.normal(loc=0, scale=settings['cls_init_std'], size=(vm.dim_a, n_user))
 
@@ -118,9 +117,6 @@ if __name__ == '__main__':
     # Init. updaters
     approx_upd = ApproximateUpdater(x_mat_0=x_mat_0,
                                     gamma=settings['gamma'])
-
-    # ls_upd = LeastSquare(x_mat_0=x_mat_0,
-    #                     max_nfev=settings['max_nfev'])
 
     bfgs_upd = BFGS(x_mat_0=x_mat_0,
                     max_iter=settings['max_iter'])
@@ -143,6 +139,11 @@ if __name__ == '__main__':
     a_mat = alt.run(vm, rating_mat_tr, rating_mat_va, n_alter, min_value, max_value,
                     logger=logger,
                     rating_mat_te=rating_mat_te)
+
+    # ------- Print the best validated result -------
+    best_iter = np.argmin(logger.rmse_va)
+    print('---> best iter: %d, rmse train: %.3f, rmse val: %.3f rmse test: %.3f' %
+          (int(best_iter), logger.rmse_tr[best_iter], logger.rmse_va[best_iter], logger.rmse_te[best_iter]))
 
     # ------- Save the results -------
     logger.save(ext={

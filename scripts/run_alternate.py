@@ -1,34 +1,20 @@
 import numpy as np
+from numpy.random import default_rng
 import os
 
-from app.utils.data_handler import get_edge_list_from_file_ml100k, map_ids, get_rating_mat
-from app.models.vandermonde import Vandermonde
+from app.utils.data_handler import load_dataset
+from app.models.vandermonde import Vandermonde, VandermondeType
 from core.alternate import Alternate
 from app.models.clustering.kmeans import KMeans
 from app.models.clustering.boosting import Boosting
 from app.models.updating.approximate_updater import ApproximateUpdater
-from app.models.updating.least_square import LeastSquare
-from app.models.updating.randomizer import Randomizer
+from app.models.updating.bfgs import BFGS
 from app.models.updating.multi_updater_wrapper import MultiUpdaterWrapper
 from app.models.logger import Logger
 
 
 def estimate_l2_lambda(ratio, std_err, n_eq, std_est, n_est):
     return ratio * (std_err*n_eq) / (n_est*std_est)
-
-
-def load_data(loadpath, filename_tr, filename_te):
-    edges_notmapped_tr = get_edge_list_from_file_ml100k(loadpath, filename_tr)
-    edges_notmapped_te = get_edge_list_from_file_ml100k(loadpath, filename_te)
-
-    edges, map_u, map_i, num_user, num_item = map_ids(edges_notmapped_tr + edges_notmapped_te)
-    edges_tr = edges[:len(edges_notmapped_tr)]
-    edges_te = edges[len(edges_notmapped_tr):]
-
-    rat_mat_tr = get_rating_mat(edges_tr, num_user, num_item)
-    rat_mat_te = get_rating_mat(edges_te, num_user, num_item)
-
-    return rat_mat_tr, rat_mat_te, num_user, num_item
 
 
 def get_kmeans_approx_settings():
@@ -179,41 +165,111 @@ def get_boosted_kmeans_approx_ls_settings():
     return sett
 
 
+def get_kmeans_approx_bfgs_settings():
+    sett = {}
+
+    method = 'kmeans_approx_bfgs'
+
+    sett['method'] = method
+
+    # Vandermonde settings
+    sett['dim_x'] = 3
+    sett['m'] = 4
+    sett['vm_type'] = VandermondeType.COS_MULT
+
+    # Clustering settings
+    sett['n_cluster'] = 7
+    sett['cls_init_std'] = 0.1
+
+    # Updater settings
+    sett['gamma'] = 1
+    sett['max_iter_bfgs'] = 5
+
+    # Regularization coefficients
+    sett['l2_lambda'] = 100
+    sett['l2_lambda_cls'] = 0
+
+    return sett
+
+
+def get_boosted_kmeans_approx_bfgs_settings():
+    sett = {}
+
+    method = 'boosted_kmeans_approx_bfgs'
+
+    sett['method'] = method
+
+    # Vandermonde settings
+    sett['dim_x'] = 2
+    sett['m'] = 3
+    sett['vm_type'] = VandermondeType.COS_MULT
+
+    # Clustering settings
+    sett['n_cluster'] = 2
+    sett['cls_init_std'] = 0.1
+    sett['n_learner'] = 7
+    sett['n_iter_cls'] = 3
+
+    # Updater settings
+    sett['gamma'] = 1
+    sett['max_iter_bfgs'] = 5
+
+    # Regularization coefficients
+    sett['l2_lambda'] = 10000
+    sett['l2_lambda_cls'] = 0
+
+    return sett
+
+
 if __name__ == '__main__':
     # ------- Settings -------
-    # Method settings
-    settings = get_boosted_kmeans_approx_ls_settings()
+    # Method
+    settings = get_boosted_kmeans_approx_bfgs_settings()
 
-    # General settings
-    do_plot = False
+    print(settings)
 
-    # Load settings
-    load_path = os.path.join('..', 'data', 'ml-100k')
-    file_name_tr = 'u3.base'
-    file_name_te = 'u3.test'
+    # General
+    do_plot = True
+
+    # Path
+    load_path = os.path.join('..', 'data', 'ml-1m')
+
     save_path = os.path.join('..', 'results')
+    os.makedirs(save_path, exist_ok=True)
 
-    # Dataset settings
+    # Dataset
+    dataset_name = 'ml-1m'
     min_value = 1
     max_value = 5
 
-    # Alternation settings
-    n_alter = 40
+    # Cross-validation
+    test_split = 0.05
+    val_split = 0.05 / (1 - test_split)
 
-    print(settings['l2_lambda'])
+    # Item-based (True) or user-based
+    do_transpose = False
+
+    # Alternation
+    n_alter = 15
 
     # ------- Load data -------
-    rating_mat_tr, rating_mat_te, n_user, n_item = load_data(load_path, file_name_tr, file_name_te)
+    rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item = \
+        load_dataset(load_path, dataset_name, te_split=test_split, va_split=val_split, do_transpose=do_transpose)
+
+    print('Data loaded ...')
 
     # ------- Initialization -------
+    rng = default_rng(1)
+
     #  Init. Vandermonde
-    vm = Vandermonde(dim_x=settings['dim_x'],
-                     m=settings['m'],
-                     l2_lambda=settings['l2_lambda'])
+    vm = Vandermonde.get_instance(dim_x=settings['dim_x'],
+                                  m=settings['m'],
+                                  l2_lambda=settings['l2_lambda'],
+                                  vm_type=settings['vm_type'])
 
     #  Init. "x" and "a_c"
-    x_mat_0 = np.random.random((settings['dim_x'], n_item))
-    a_c_mat_0 = np.random.normal(loc=0, scale=settings['cls_init_std'], size=(vm.dim_a, settings['n_cluster']))
+    x_mat_0 = rng.random((settings['dim_x'], n_item))
+    a_c_mat_0 = rng.normal(loc=0, scale=settings['cls_init_std'], size=(vm.dim_a, settings['n_cluster']))
 
     #  Init. clustering
     kmeans = KMeans(n_cluster=settings['n_cluster'],
@@ -228,10 +284,10 @@ if __name__ == '__main__':
     approx_upd = ApproximateUpdater(x_mat_0=x_mat_0,
                                     gamma=settings['gamma'])
 
-    ls_upd = LeastSquare(x_mat_0=x_mat_0,
-                         max_nfev=settings['max_nfev'])
+    bfgs_upd = BFGS(x_mat_0=x_mat_0,
+                    max_iter=settings['max_iter_bfgs'])
 
-    multi_upd = MultiUpdaterWrapper(upds=[approx_upd, ls_upd])
+    multi_upd = MultiUpdaterWrapper(upds=[approx_upd, bfgs_upd])
 
     # Init. alternate
     alt = Alternate(cls=boost, upd=multi_upd)
@@ -244,7 +300,20 @@ if __name__ == '__main__':
     vm.transform(x_mat_0)
 
     # ------- Do the alternation -------
-    alt.run(vm, rating_mat_tr, rating_mat_te, n_alter, min_value, max_value, logger=logger)
+    a_mat = alt.run(vm, rating_mat_tr, rating_mat_va, n_alter, min_value, max_value,
+                    logger=logger,
+                    rating_mat_te=rating_mat_te)
+
+    # ------- Print the best validated result -------
+    best_iter = np.argmin(logger.rmse_va)
+    print('---> best iter: %d, rmse train: %.3f, rmse val: %.3f rmse test: %.3f' %
+          (int(best_iter), logger.rmse_tr[best_iter], logger.rmse_va[best_iter], logger.rmse_te[best_iter]))
 
     # ------- Save the results -------
-    logger.save()
+    # logger.save(ext={
+    #     'x_mat': alt.upd.x_mat,
+    #     'a_mat': a_mat,
+    #     'rating_mat_tr': rating_mat_tr,
+    #     'rating_mat_va': rating_mat_va,
+    #     'rating_mat_te': rating_mat_te,
+    # })

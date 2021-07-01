@@ -8,7 +8,7 @@ def vectorize_rows(rows_indices, mat):
     :param mat:
     :return: [-1 x 1]
     """
-    vec_rows = mat[rows_indices].reshape((-1,), order='C')
+    vec_rows = vectorize(mat[rows_indices], order='C')
     return vec_rows[~np.isnan(vec_rows)].reshape((-1, 1))
 
 

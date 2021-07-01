@@ -1,5 +1,6 @@
 import csv
 import numpy as np
+from numpy.random import default_rng
 from sklearn.model_selection import train_test_split
 import os
 import pandas as pd
@@ -14,7 +15,7 @@ def load_dataset(loadpath, name, va_split=None, te_split=None, part=1, do_transp
         edges, map_u, map_i, num_user, num_item = map_ids(edges_notmapped_tr_va + edges_notmapped_te)
 
         edges_tr_va = edges[:len(edges_notmapped_tr_va)]
-        edges_tr, edges_va = train_test_split(edges_tr_va, test_size=va_split)
+        edges_tr, edges_va = train_test_split(edges_tr_va, test_size=va_split, random_state=1)
         edges_te = edges[len(edges_notmapped_tr_va):]
 
         rat_mat_tr = get_rating_mat(edges_tr, num_user, num_item)
@@ -25,8 +26,8 @@ def load_dataset(loadpath, name, va_split=None, te_split=None, part=1, do_transp
         edges_notmapped = get_edge_list_from_file_ml1m(loadpath, 'ratings.dat')
         edges, map_u, map_i, num_user, num_item = map_ids(edges_notmapped)
 
-        edges_tr_va, edges_te = train_test_split(edges, test_size=te_split)
-        edges_tr, edges_va = train_test_split(edges_tr_va, test_size=va_split)
+        edges_tr_va, edges_te = train_test_split(edges, test_size=te_split, random_state=1)
+        edges_tr, edges_va = train_test_split(edges_tr_va, test_size=va_split, random_state=2)
 
         rat_mat_tr = get_rating_mat(edges_tr, num_user, num_item)
         rat_mat_va = get_rating_mat(edges_va, num_user, num_item)
@@ -36,12 +37,15 @@ def load_dataset(loadpath, name, va_split=None, te_split=None, part=1, do_transp
         df_1 = pd.read_excel(os.path.join(loadpath, 'jester-data-1.xls'))
         df_2 = pd.read_excel(os.path.join(loadpath, 'jester-data-2.xls'))
 
-        # ToDo
-        rat_mat_1 = df_1.to_numpy()[:, 1:]  # 2000
+        rat_mat_1 = df_1.to_numpy()[:, 1:]
         rat_mat_2 = df_2.to_numpy()[:, 1:]
 
         # Concat two datasets
         rat_mat = np.concatenate((rat_mat_1, rat_mat_2), axis=0)
+
+        # ToDo
+        n_sub_user = 2000
+        rat_mat = rat_mat[:n_sub_user, :]
 
         # Fill unrated cells with NaNs
         rat_mat[rat_mat == 99] = np.NaN
