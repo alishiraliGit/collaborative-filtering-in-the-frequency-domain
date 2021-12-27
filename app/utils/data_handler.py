@@ -80,9 +80,6 @@ def load_dataset(loadpath, name, va_split=None, te_split=None, part=1, do_transp
         # Convert to numpy array
         rat_mat = df.to_numpy()[::5]
 
-        # ToDo
-        rat_mat -= 0.5
-
         # Train-test split
         rated_indices = np.where(~np.isnan(rat_mat))
 

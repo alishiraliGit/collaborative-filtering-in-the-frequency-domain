@@ -15,13 +15,13 @@ def get_als_settings():
     sett['method'] = method
 
     # Hidden dim
-    sett['dim'] = 2
+    sett['dim'] = 3
 
     # Weight init. std
     sett['w_init_std'] = 0.1
 
     # Regularization coefficients
-    sett['l2_lambda'] = 0
+    sett['l2_lambda'] = 1
 
     return sett
 
@@ -37,15 +37,15 @@ if __name__ == '__main__':
     do_plot = True
 
     # Path
-    load_path = os.path.join('..', 'data', 'jester')
+    load_path = os.path.join('..', 'data', 'monday_offers')
 
     save_path = os.path.join('..', 'results')
     os.makedirs(save_path, exist_ok=True)
 
     # Dataset
-    dataset_name = 'jester'
-    min_value = -10
-    max_value = 10
+    dataset_name = 'monday_offers'
+    min_value = 0
+    max_value = 1
     # part = 5
 
     # Cross-validation
@@ -53,7 +53,7 @@ if __name__ == '__main__':
     val_split = 0.1/(1 - test_split)
 
     # Item-based or user-based
-    do_transpose = True
+    do_transpose = False
 
     # Alternation
     n_alter = 15

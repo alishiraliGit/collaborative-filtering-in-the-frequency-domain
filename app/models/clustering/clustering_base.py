@@ -11,13 +11,13 @@ class Clustering(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def transform(self, vm: Vandermonde, rating_mat):
+    def transform(self, vm: Vandermonde, rating_mat, **kwargs):
         pass
 
-    def fit_transform(self, vm: Vandermonde, rating_mat):
+    def fit_transform(self, vm: Vandermonde, rating_mat, **kwargs):
         self.fit(vm, rating_mat)
 
-        return self.transform(vm, rating_mat)
+        return self.transform(vm, rating_mat, **kwargs)
 
     @abc.abstractmethod
     def copy(self, do_init):

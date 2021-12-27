@@ -45,12 +45,11 @@ if __name__ == '__main__':
     os.makedirs(save_path, exist_ok=True)
 
     # File
-    # Jester with 8000
-    filename = 'result-methodals-dim2-w_init_std1e-01-l2_lambda0-2021-06-29 18-44-54'
+    filename = 'result-methodals-dim2-w_init_std1e-01-l2_lambda1-2021-09-04 10-42-53'
 
     # Dataset
-    min_value = -10
-    max_value = 10
+    min_value = 0
+    max_value = 1
 
     # Plot
     max_x_y = 7
@@ -73,6 +72,7 @@ if __name__ == '__main__':
     print('User %d is selected with rmse = %.3f' % (u, rmse[u]))
 
     # ------- Plot -------
+    '''
     plot2d(ext_dic['w_u'], ext_dic['w_i'], ext_dic['b_u'], ext_dic['b_i'], ext_dic['rating_mat_' + cv],
            user=u,
            max_x=max_x_y,
@@ -83,3 +83,4 @@ if __name__ == '__main__':
 
     plt.savefig(os.path.join(save_path, cv + '_' + filename))
     plt.savefig(os.path.join(save_path, cv + '_' + filename + '.pdf'))
+    '''

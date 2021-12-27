@@ -201,13 +201,13 @@ def get_boosted_kmeans_approx_bfgs_settings():
 
     # Vandermonde settings
     sett['dim_x'] = 2
-    sett['m'] = 3
+    sett['m'] = 2
     sett['vm_type'] = VandermondeType.COS_MULT
 
     # Clustering settings
     sett['n_cluster'] = 2
     sett['cls_init_std'] = 0.1
-    sett['n_learner'] = 7
+    sett['n_learner'] = 13
     sett['n_iter_cls'] = 3
 
     # Updater settings
@@ -215,7 +215,7 @@ def get_boosted_kmeans_approx_bfgs_settings():
     sett['max_iter_bfgs'] = 5
 
     # Regularization coefficients
-    sett['l2_lambda'] = 10000
+    sett['l2_lambda'] = 10
     sett['l2_lambda_cls'] = 0
 
     return sett
@@ -232,25 +232,25 @@ if __name__ == '__main__':
     do_plot = True
 
     # Path
-    load_path = os.path.join('..', 'data', 'ml-1m')
+    load_path = os.path.join('..', 'data', 'monday_offers')
 
     save_path = os.path.join('..', 'results')
     os.makedirs(save_path, exist_ok=True)
 
     # Dataset
-    dataset_name = 'ml-1m'
-    min_value = 1
-    max_value = 5
+    dataset_name = 'monday_offers'
+    min_value = 0
+    max_value = 1
 
     # Cross-validation
-    test_split = 0.05
-    val_split = 0.05 / (1 - test_split)
+    test_split = 0.1
+    val_split = 0.1 / (1 - test_split)
 
     # Item-based (True) or user-based
     do_transpose = False
 
     # Alternation
-    n_alter = 15
+    n_alter = 10
 
     # ------- Load data -------
     rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item = \
@@ -295,6 +295,8 @@ if __name__ == '__main__':
     # Init. logger
     logger = Logger(settings=settings, save_path=save_path, do_plot=do_plot)
 
+    print('Init. done ...')
+
     # ------- Fit Vandermonde -------
     vm.fit()
     vm.transform(x_mat_0)
@@ -310,10 +312,10 @@ if __name__ == '__main__':
           (int(best_iter), logger.rmse_tr[best_iter], logger.rmse_va[best_iter], logger.rmse_te[best_iter]))
 
     # ------- Save the results -------
-    # logger.save(ext={
-    #     'x_mat': alt.upd.x_mat,
-    #     'a_mat': a_mat,
-    #     'rating_mat_tr': rating_mat_tr,
-    #     'rating_mat_va': rating_mat_va,
-    #     'rating_mat_te': rating_mat_te,
-    # })
+    logger.save(ext={
+        'x_mat': alt.upd.x_mat,
+        'a_mat': a_mat,
+        'rating_mat_tr': rating_mat_tr,
+        'rating_mat_va': rating_mat_va,
+        'rating_mat_te': rating_mat_te,
+    })

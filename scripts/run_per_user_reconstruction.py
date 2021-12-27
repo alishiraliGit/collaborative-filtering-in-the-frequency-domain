@@ -59,25 +59,25 @@ if __name__ == '__main__':
     init_load_path = os.path.join('..', 'results')
 
     # Path
-    load_path = os.path.join('..', 'data', 'jester')
+    load_path = os.path.join('..', 'data', 'monday_offers')
 
     save_path = os.path.join('..', 'results')
     os.makedirs(save_path, exist_ok=True)
 
     # Dataset
-    dataset_name = 'jester'
-    min_value = -10
-    max_value = 10
+    dataset_name = 'monday_offers'
+    min_value = 0
+    max_value = 1
 
     # Cross-validation
     test_split = 0.1
     val_split = 0.1/(1 - test_split)
 
     # Item-based (True) or user-based
-    do_transpose = True
+    do_transpose = False
 
     # Alternation
-    n_alter = 20
+    n_alter = 5
 
     # ------- Load data -------
     rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item =\
