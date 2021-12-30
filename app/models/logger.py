@@ -73,3 +73,11 @@ class Logger:
                 stringified += Logger.stringify(val)
 
         return stringified
+
+    @staticmethod
+    def dicts_to_dic(dicts):
+        items_list = []
+        for dic in dicts:
+            items_list += list(dic.items())
+
+        return dict(items_list)

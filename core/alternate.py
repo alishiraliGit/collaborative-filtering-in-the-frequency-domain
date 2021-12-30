@@ -19,8 +19,11 @@ class Alternate:
         for it in range(n_iter):
             # Do clustering
             a_c_mat, users_clusters = self.cls.fit_transform(vm, rating_mat_tr)
-
             a_mat = a_c_mat[:, users_clusters]
+
+            if rating_mat_te is not None:
+                a_c_mat_tt, users_clusters_tt = self.cls.fit_transform(vm, rating_mat_tr, is_test=True)
+                a_mat_tt = a_c_mat_tt[:, users_clusters_tt]
 
             # Do updating
             self.upd.fit_transform(vm, a_mat, rating_mat_tr)
@@ -29,21 +32,27 @@ class Alternate:
             rmse_tr = self.calc_prediction_rmse(vm, a_mat, rating_mat_tr, min_val, max_val)
             rmse_va = self.calc_prediction_rmse(vm, a_mat, rating_mat_va, min_val, max_val)
             if rating_mat_te is not None:
-                rmse_te = self.calc_prediction_rmse(vm, a_mat, rating_mat_te, min_val, max_val)
+                rmse_te = self.calc_prediction_rmse(vm, a_mat_tt, rating_mat_te, min_val, max_val)
             else:
                 rmse_te = np.NaN
 
             if isinstance(logger, Logger):
                 logger.log(rmse_tr, rmse_va, rmse_te)
 
-                if rmse_va <= np.min(logger.rmse_va):
-                    a_mat_opt = a_mat
-                    print('(this iteration has been optimum till now!)')
-                else:
+                if rmse_va > np.min(logger.rmse_va):
                     # ToDo
-                    pass
+                    continue
+
+                if rating_mat_te is not None:
+                    a_mat_opt = a_mat_tt
+                else:
+                    a_mat_opt = a_mat
+                print('(this iteration has been optimum till now!)')
             else:
-                a_mat_opt = a_mat
+                if rating_mat_te is not None:
+                    a_mat_opt = a_mat_tt
+                else:
+                    a_mat_opt = a_mat
 
         return a_mat_opt
 

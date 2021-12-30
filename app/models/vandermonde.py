@@ -44,7 +44,10 @@ class Vandermonde(abc.ABC):
 
         s_u = vectorize_rows(users, rating_mat)
 
-        a_u = np.linalg.inv(v_u_mat.dot(v_u_mat.T) + self.l2_lambda*np.eye(self.dim_a)).dot(v_u_mat).dot(s_u)
+        e1 = np.zeros((self.dim_a, self.dim_a))
+        e1[0, 0] = 1  # Do not regularize a_0
+        a_u = np.linalg.inv(v_u_mat.dot(v_u_mat.T) +
+                            self.l2_lambda*np.eye(self.dim_a) - self.l2_lambda*e1).dot(v_u_mat).dot(s_u)
 
         return a_u
 

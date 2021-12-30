@@ -6,16 +6,18 @@ import os
 import pandas as pd
 
 
-def load_dataset(loadpath, name, va_split=None, te_split=None, part=1, do_transpose=False):
+def load_dataset(loadpath, name, va_split=None, te_split=None, random_state=1, do_transpose=False, **kwargs):
+
+    rng = default_rng(random_state)
 
     if name == 'ml-100k':
-        edges_notmapped_tr_va = get_edge_list_from_file_ml100k(loadpath, 'u%d.base' % part)
-        edges_notmapped_te = get_edge_list_from_file_ml100k(loadpath, 'u%d.test' % part)
+        edges_notmapped_tr_va = get_edge_list_from_file_ml100k(loadpath, 'u%d.base' % kwargs['part'])
+        edges_notmapped_te = get_edge_list_from_file_ml100k(loadpath, 'u%d.test' % kwargs['part'])
 
         edges, map_u, map_i, num_user, num_item = map_ids(edges_notmapped_tr_va + edges_notmapped_te)
 
         edges_tr_va = edges[:len(edges_notmapped_tr_va)]
-        edges_tr, edges_va = train_test_split(edges_tr_va, test_size=va_split, random_state=1)
+        edges_tr, edges_va = train_test_split(edges_tr_va, test_size=va_split, random_state=random_state)
         edges_te = edges[len(edges_notmapped_tr_va):]
 
         rat_mat_tr = get_rating_mat(edges_tr, num_user, num_item)
@@ -26,8 +28,8 @@ def load_dataset(loadpath, name, va_split=None, te_split=None, part=1, do_transp
         edges_notmapped = get_edge_list_from_file_ml1m(loadpath, 'ratings.dat')
         edges, map_u, map_i, num_user, num_item = map_ids(edges_notmapped)
 
-        edges_tr_va, edges_te = train_test_split(edges, test_size=te_split, random_state=1)
-        edges_tr, edges_va = train_test_split(edges_tr_va, test_size=va_split, random_state=2)
+        edges_tr_va, edges_te = train_test_split(edges, test_size=te_split, random_state=random_state)
+        edges_tr, edges_va = train_test_split(edges_tr_va, test_size=va_split/(1 - te_split), random_state=random_state)
 
         rat_mat_tr = get_rating_mat(edges_tr, num_user, num_item)
         rat_mat_va = get_rating_mat(edges_va, num_user, num_item)
@@ -53,8 +55,9 @@ def load_dataset(loadpath, name, va_split=None, te_split=None, part=1, do_transp
         # Train-test split
         rated_indices = np.where(~np.isnan(rat_mat))
 
-        tr_va_idx, te_idx = train_test_split(range(len(rated_indices[0])), test_size=te_split, random_state=1)
-        tr_idx, va_idx = train_test_split(tr_va_idx, test_size=va_split, random_state=2)
+        tr_va_idx, te_idx = \
+            train_test_split(range(len(rated_indices[0])), test_size=te_split, random_state=random_state)
+        tr_idx, va_idx = train_test_split(tr_va_idx, test_size=va_split/(1 - te_split), random_state=random_state)
 
         tr_rated_indices = (rated_indices[0][tr_idx], rated_indices[1][tr_idx])
         va_rated_indices = (rated_indices[0][va_idx], rated_indices[1][va_idx])
@@ -83,8 +86,9 @@ def load_dataset(loadpath, name, va_split=None, te_split=None, part=1, do_transp
         # Train-test split
         rated_indices = np.where(~np.isnan(rat_mat))
 
-        tr_va_idx, te_idx = train_test_split(range(len(rated_indices[0])), test_size=te_split, random_state=1)
-        tr_idx, va_idx = train_test_split(tr_va_idx, test_size=va_split, random_state=2)
+        tr_va_idx, te_idx = \
+            train_test_split(range(len(rated_indices[0])), test_size=te_split, random_state=random_state)
+        tr_idx, va_idx = train_test_split(tr_va_idx, test_size=va_split, random_state=random_state)
 
         tr_rated_indices = (rated_indices[0][tr_idx], rated_indices[1][tr_idx])
         va_rated_indices = (rated_indices[0][va_idx], rated_indices[1][va_idx])
@@ -103,6 +107,28 @@ def load_dataset(loadpath, name, va_split=None, te_split=None, part=1, do_transp
         rat_mat_te[te_rated_indices] = rat_mat[te_rated_indices]
 
         num_user, num_item = rat_mat.shape
+
+    elif name == 'coat':
+        file_path_tr = os.path.join(loadpath, 'train.ascii')
+        file_path_te = os.path.join(loadpath, 'test.ascii')
+
+        rat_mat_tr_va = np.genfromtxt(fname=file_path_tr, delimiter=' ', dtype=np.float)
+        rat_mat_te = np.genfromtxt(fname=file_path_te, delimiter=' ', dtype=np.float)
+
+        rat_mat_tr_va[rat_mat_tr_va == 0] = np.nan
+        rat_mat_te[rat_mat_te == 0] = np.nan
+
+        num_user, num_item = rat_mat_tr_va.shape
+
+        # Train-validation split
+        mask_tr = np.ones((num_user, num_item), dtype=bool)
+        mask_tr[rng.random(size=(num_user, num_item)) < va_split] = False
+
+        rat_mat_tr = rat_mat_tr_va.copy()
+        rat_mat_tr[~mask_tr] = np.nan
+
+        rat_mat_va = rat_mat_tr_va.copy()
+        rat_mat_va[mask_tr] = np.nan
 
     else:
         raise Exception('%s is not valid dataset.' % name)
@@ -174,6 +200,7 @@ def get_rating_mat(edges, n_user, n_item):
 
 
 if __name__ == '__main__':
-    load_path = os.path.join('..', '..', 'data', 'monday_offers')
+    load_path = os.path.join('..', '..', 'data', 'coat')
 
-    rating_mat_tr, rating_mat_va, rating_mat_te, n_u, n_i = load_dataset(load_path, 'monday_offers', 0.2, 0.1)
+    rating_mat_tr, rating_mat_va, rating_mat_te, n_u, n_i = \
+        load_dataset(load_path, 'coat', va_split=0.1, random_state=1)

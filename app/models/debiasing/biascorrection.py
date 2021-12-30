@@ -5,9 +5,14 @@ from app.models.vandermonde import Vandermonde
 
 
 class FirstOrderBiasCorrection:
-    def __init__(self, sigma_n, n_iter=1):
-        self.sigma_n = sigma_n  # Standard deviation of noise
+    def __init__(self, n_iter=1, estimate_sigma_n=False, sigma_n=None, min_alpha=-1., max_alpha=1.):
         self.n_iter = n_iter  # Num. of iterations to find alpha and bias
+        self.estimate_sigma_n = estimate_sigma_n
+        self.sigma_n = sigma_n  # Standard deviation of noise
+        self.min_alpha = min_alpha
+        self.max_alpha = max_alpha
+
+        assert (sigma_n is not None) or estimate_sigma_n
 
     @staticmethod
     def _likelihood(alpha, r, obs_mask, p_0):
@@ -25,7 +30,7 @@ class FirstOrderBiasCorrection:
             np.prod(1 - p_0*(1 + alpha*(r[~obs_mask] - r_mean)))
 
     @staticmethod
-    def _find_alpha_feasible_range(r, obs_mask, p_0, min_alpha=-1, max_alpha=1):
+    def _find_alpha_feasible_range(r, obs_mask, p_0, min_alpha=-1., max_alpha=1.):
         max_rng = max_alpha
         if np.min(r[obs_mask]) < np.mean(r):
             max_rng = np.minimum(max_rng, 1/(np.mean(r) - np.min(r[obs_mask])))
@@ -41,7 +46,7 @@ class FirstOrderBiasCorrection:
         return min_rng - 1e-4, max_rng + 1e-4  # To solve a bug in Scipy
 
     @staticmethod
-    def find_alpha(r, obs_mask, p_0, min_alpha=-1, max_alpha=1):
+    def find_alpha(r, obs_mask, p_0, min_alpha=-1., max_alpha=1.):
         min_alpha, max_alpha = \
             FirstOrderBiasCorrection._find_alpha_feasible_range(r, obs_mask, p_0, min_alpha, max_alpha)
 
@@ -57,16 +62,24 @@ class FirstOrderBiasCorrection:
 
     @staticmethod
     def calc_k_hat(v_obs_mat):
-        return v_obs_mat.dot(v_obs_mat.T) / v_obs_mat.shape[1]
+        return v_obs_mat.dot(v_obs_mat.T)/v_obs_mat.shape[1]
 
     @staticmethod
-    def calc_bias(v_obs_mat, alpha, sigma_n):
-        k_mat = FirstOrderBiasCorrection.calc_k_hat(v_obs_mat)
+    def calc_bias(v_mat, obs_mask, alpha, sigma_n, l2_lambda=0):
+        v_obs_mat = v_mat[:, obs_mask]
+
+        dim_a = v_mat.shape[0]
+        e1 = np.zeros((dim_a, dim_a))
+        e1[0, 0] = 1
+
+        k_mat = FirstOrderBiasCorrection.calc_k_hat(v_obs_mat) + l2_lambda*e1
         k_inv_mat = np.linalg.inv(k_mat)
 
-        bias = k_inv_mat[:, 0]*(sigma_n ** 2)*alpha
+        v_mean = np.mean(v_mat, axis=1).reshape((-1, 1))
 
-        return bias
+        bias = k_inv_mat.dot(v_mean)*(sigma_n**2)*alpha
+
+        return bias[:, 0]
 
     def debias(self, vm: Vandermonde, a, r):
         obs_mask = ~np.isnan(r)
@@ -80,14 +93,21 @@ class FirstOrderBiasCorrection:
             # --- Estimate alpha ---
             # Predict ratings
             r_hat = vm.predict(a_un.reshape((-1, 1)))[0]
+
+            # Estimate sigma_n
+            if self.estimate_sigma_n:
+                sigma_n = np.std(r_hat[obs_mask] - r[obs_mask])
+            else:
+                sigma_n = self.sigma_n
+
+            # Fill known ratings
             r_hat[obs_mask] = r[obs_mask]
 
             # Find alpha
-            alpha_hat = self.find_alpha(r_hat, obs_mask, p_0_hat)
+            alpha_hat = self.find_alpha(r_hat, obs_mask, p_0_hat, min_alpha=self.min_alpha, max_alpha=self.max_alpha)
 
             # --- Estimate bias ---
-            v_obs_mat = vm.v_mat[:, obs_mask]
-            bias = self.calc_bias(v_obs_mat, alpha_hat, self.sigma_n)
+            bias = self.calc_bias(vm.v_mat, obs_mask, alpha_hat, sigma_n, vm.l2_lambda)
 
             # --- Update a_un ---
             a_un = a - bias

@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numpy as np
 from numpy.random import default_rng
 import os
@@ -5,11 +6,13 @@ import os
 from app.utils.data_handler import load_dataset
 from app.models.vandermonde import Vandermonde, VandermondeType
 from core.alternate import Alternate
-from app.models.clustering.one_user_one_cluster import OneUserOneCluster
+from app.models.clustering.one_user_one_cluster import OneUserOneCluster, OneUserOneClusterBiasCorrected
 from app.models.updating.approximate_updater import ApproximateUpdater
 from app.models.updating.bfgs import BFGS
 from app.models.updating.multi_updater_wrapper import MultiUpdaterWrapper
 from app.models.logger import Logger
+
+rng = default_rng(11)
 
 
 def estimate_l2_lambda(ratio, var_err, n_sample, var_a, dim_a):
@@ -24,19 +27,22 @@ def get_bfgs_settings():
     sett['method'] = method
 
     # Vandermonde settings
-    sett['dim_x'] = 2
+    sett['dim_x'] = 1
     sett['m'] = 2
     sett['vm_type'] = VandermondeType.COS_MULT
 
     # Clustering settings
-    sett['cls_init_std'] = 0.1
+    sett['n_iter_alpha'] = 1
+    sett['estimate_sigma_n'] = True
+    sett['sigma_n'] = 0
+    sett['min_alpha'] = 0
 
     # Updater settings
     sett['gamma'] = 1  # default: 1
     sett['max_iter'] = 5  # default: 5
 
     # Regularization coefficients
-    sett['l2_lambda'] = 100  # default: 1000
+    sett['l2_lambda'] = 10  # default: 1000
 
     return sett
 
@@ -52,42 +58,36 @@ if __name__ == '__main__':
 
     # General
     do_plot = True
-
-    # Init.
-    do_init_from_file = False
-    init_filename = 'result-methodals-dim2-w_init_std1e-01-l2_lambda1-2021-02-06 12-06-36'
-    init_load_path = os.path.join('..', 'results')
+    do_save = False
 
     # Path
-    load_path = os.path.join('..', 'data', 'monday_offers')
+    load_path = os.path.join('..', 'data', 'coat')
 
     save_path = os.path.join('..', 'results')
     os.makedirs(save_path, exist_ok=True)
 
     # Dataset
-    dataset_name = 'monday_offers'
-    min_value = 0
-    max_value = 1
+    dataset_name = 'coat'
+    min_value = 1
+    max_value = 5
 
     # Cross-validation
-    test_split = 0.1
-    val_split = 0.1/(1 - test_split)
+    val_split = 0.1
 
     # Item-based (True) or user-based
     do_transpose = False
 
     # Alternation
-    n_alter = 5
+    n_alter = 30
 
     # ------- Load data -------
     rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item =\
-        load_dataset(load_path, dataset_name, te_split=test_split, va_split=val_split, do_transpose=do_transpose)
+        load_dataset(load_path, dataset_name, va_split=val_split, do_transpose=do_transpose, random_state=1)
 
     print('Data loaded ...')
 
     # ------- Initialization -------
-    rng = default_rng(1)
-    #  Init. Vandermonde
+    #  Init. VM
     vm = Vandermonde.get_instance(
         dim_x=settings['dim_x'],
         m=settings['m'],
@@ -95,24 +95,16 @@ if __name__ == '__main__':
         vm_type=settings['vm_type']
     )
 
-    #  Init. "x" and "a_c"
-    if do_init_from_file:
-        ext_dic = Logger.load(init_load_path, init_filename, load_ext=True)
-        x_mat_0 = ext_dic['w_i']
-
-        min_x_0 = np.min(x_mat_0)
-        max_x_0 = np.max(x_mat_0)
-
-        x_mat_0 = (x_mat_0 - min_x_0) / (max_x_0 - min_x_0)
-
-    else:
-        x_mat_0 = rng.random((settings['dim_x'], n_item))
-
-    a_c_mat_0 = rng.normal(loc=0, scale=settings['cls_init_std'], size=(vm.dim_a, n_user))
+    #  Init. "x"
+    x_mat_0 = rng.random((settings['dim_x'], n_item))
 
     #  Init. clustering
-    one_user_one_cluster = OneUserOneCluster(n_cluster=n_user,
-                                             a_c_mat_0=a_c_mat_0)
+    one_user_one_cluster = OneUserOneClusterBiasCorrected(
+        n_iter=settings['n_iter_alpha'],
+        estimate_sigma_n=settings['estimate_sigma_n'],
+        sigma_n=settings['sigma_n'],
+        min_alpha=settings['min_alpha']
+    )
 
     # Init. updaters
     approx_upd = ApproximateUpdater(x_mat_0=x_mat_0,
@@ -137,19 +129,32 @@ if __name__ == '__main__':
 
     # ------- Do the alternation -------
     a_mat = alt.run(vm, rating_mat_tr, rating_mat_va, n_alter, min_value, max_value,
-                    logger=logger,
-                    rating_mat_te=rating_mat_te)
+                    rating_mat_te=rating_mat_te,
+                    logger=logger)
 
     # ------- Print the best validated result -------
     best_iter = np.argmin(logger.rmse_va)
     print('---> best iter: %d, rmse train: %.3f, rmse val: %.3f rmse test: %.3f' %
           (int(best_iter), logger.rmse_tr[best_iter], logger.rmse_va[best_iter], logger.rmse_te[best_iter]))
 
+    # ------- Plot predictions -------
+    rating_mat_pr = vm.predict(a_mat)
+    plt.figure(figsize=(8, 4))
+
+    plt.subplot(1, 2, 1)
+    mask_tr = ~np.isnan(rating_mat_tr)
+    plt.plot(rating_mat_tr[mask_tr], rating_mat_pr[mask_tr], 'k*')
+
+    plt.subplot(1, 2, 2)
+    mask_te = ~np.isnan(rating_mat_te)
+    plt.plot(rating_mat_te[mask_te], rating_mat_pr[mask_te], 'k*')
+
     # ------- Save the results -------
-    logger.save(ext={
-        'x_mat': alt.upd.x_mat,
-        'a_mat': a_mat,
-        'rating_mat_tr': rating_mat_tr,
-        'rating_mat_va': rating_mat_va,
-        'rating_mat_te': rating_mat_te,
-    })
+    if do_save:
+        logger.save(ext={
+            'x_mat': alt.upd.x_mat,
+            'a_mat': a_mat,
+            'rating_mat_tr': rating_mat_tr,
+            'rating_mat_va': rating_mat_va,
+            'rating_mat_te': rating_mat_te,
+        })
