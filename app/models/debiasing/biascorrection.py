@@ -1,7 +1,9 @@
 import numpy as np
 from scipy.optimize import minimize_scalar
 
-from app.models.vandermonde import Vandermonde
+from app.models.vandermonde import Vandermonde, RegularizationType
+from app.models.debiasing.optimumregularization import OptimumRegularization as OptReg
+from app.utils.mat_ops import e1
 
 
 class FirstOrderBiasCorrection:
@@ -61,31 +63,26 @@ class FirstOrderBiasCorrection:
         return obj.x
 
     @staticmethod
-    def calc_k_hat(v_obs_mat):
-        return v_obs_mat.dot(v_obs_mat.T)/v_obs_mat.shape[1]
-
-    @staticmethod
-    def calc_bias(v_mat, obs_mask, alpha, sigma_n, l2_lambda=0):
+    def calc_bias(v_mat, obs_mask, alpha, sigma_n, c_mat):
         v_obs_mat = v_mat[:, obs_mask]
 
-        dim_a = v_mat.shape[0]
-        e1 = np.zeros((dim_a, dim_a))
-        e1[0, 0] = 1
-
-        k_mat = FirstOrderBiasCorrection.calc_k_hat(v_obs_mat) + l2_lambda*e1
-        k_inv_mat = np.linalg.inv(k_mat)
+        k_mat = Vandermonde.calc_k_hat(v_obs_mat)
 
         v_mean = np.mean(v_mat, axis=1).reshape((-1, 1))
 
-        bias = k_inv_mat.dot(v_mean)*(sigma_n**2)*alpha
+        bias = np.linalg.inv(k_mat + c_mat).dot(v_mean)*(sigma_n**2)*alpha
 
         return bias[:, 0]
 
     def debias(self, vm: Vandermonde, a, r):
         obs_mask = ~np.isnan(r)
 
+        # Calc k_hat
+        v_obs_mat = vm.v_mat[:, obs_mask]
+        k_mat = Vandermonde.calc_k_hat(v_obs_mat)
+
         # Estimate p_0
-        p_0_hat = np.mean(obs_mask * 1)
+        p_0_hat = np.mean(obs_mask*1)
 
         # Init.
         a_un = a
@@ -107,7 +104,7 @@ class FirstOrderBiasCorrection:
             alpha_hat = self.find_alpha(r_hat, obs_mask, p_0_hat, min_alpha=self.min_alpha, max_alpha=self.max_alpha)
 
             # --- Estimate bias ---
-            bias = self.calc_bias(vm.v_mat, obs_mask, alpha_hat, sigma_n, vm.l2_lambda)
+            bias = self.calc_bias(vm.v_mat, obs_mask, alpha_hat, sigma_n, vm.c_mat)
 
             # --- Update a_un ---
             a_un = a - bias

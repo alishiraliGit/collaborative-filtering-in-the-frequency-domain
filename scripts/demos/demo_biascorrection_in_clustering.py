@@ -1,7 +1,7 @@
 import numpy as np
 from matplotlib import pyplot as plt
 
-from app.models.vandermonde import Vandermonde, VandermondeType
+from app.models.vandermonde import Vandermonde, VandermondeType, RegularizationType
 from app.models.clustering.one_user_one_cluster import OneUserOneCluster, OneUserOneClusterBiasCorrected
 from core.alternate import Alternate
 
@@ -22,8 +22,8 @@ def simulate_mnar_data(n_user, n_item, dim_x, m, p_0, alpha, sigma_n):
     vm = Vandermonde.get_instance(
         dim_x=dim_x,
         m=m,
-        l2_lambda=0,
         vm_type=VandermondeType.COS_MULT,
+        reg_type=RegularizationType.L2,
     )
     vm.fit()
 
@@ -61,32 +61,38 @@ if __name__ == '__main__':
         'm': 2,
         'p_0': 0.2,
         'alpha': 0.2,
-        'sigma_n': 0.2,
+        'sigma_n': 0.5,
     }
 
-    # Debiaser
-    _deb_sett = {
+    # Bias correction
+    _bc_sett = {
         'm': _simul_sett['m'],
-        'l2_lambda': 1,
+        'l2_lambda': 0.5,
+
         'n_iter': 1,
         'estimate_sigma_n': True,
+        'sigma_n': 0,
+        'min_alpha': 0
     }
 
     # ----- Init. -----
     # VM
     _vm_bc = Vandermonde.get_instance(
         dim_x=_dim_x,
-        m=_deb_sett['m'],
-        l2_lambda=_deb_sett['l2_lambda'],
+        m=_bc_sett['m'],
         vm_type=VandermondeType.COS_MULT,
+        reg_type=RegularizationType.L2,
+        reg_params={'l2_lambda': _bc_sett['l2_lambda']}
     )
     _vm_bc.fit()
 
     # Clustering
     _cls = OneUserOneCluster()
-    _cls_deb = OneUserOneClusterBiasCorrected(
-        n_iter=_deb_sett['n_iter'],
-        estimate_sigma_n=_deb_sett['estimate_sigma_n']
+    _cls_bc = OneUserOneClusterBiasCorrected(
+        n_iter=_bc_sett['n_iter'],
+        estimate_sigma_n=_bc_sett['estimate_sigma_n'],
+        sigma_n=_bc_sett['sigma_n'],
+        min_alpha=_bc_sett['min_alpha']
     )
 
     # ----- Simulate ground truth ratings -----
@@ -97,7 +103,7 @@ if __name__ == '__main__':
 
     _a_hat_mat, _ = _cls.fit_transform(vm=_vm_bc, rating_mat=_r_obs_mat)
 
-    _a_hat_un_mat, _ = _cls_deb.fit_transform(vm=_vm_bc, rating_mat=_r_obs_mat, verbose=True)
+    _a_hat_un_mat, _ = _cls_bc.fit_transform(vm=_vm_bc, rating_mat=_r_obs_mat, is_test=True, verbose=True)
 
     # ----- Results -----
     # RMSE

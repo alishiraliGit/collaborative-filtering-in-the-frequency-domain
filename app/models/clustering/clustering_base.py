@@ -1,5 +1,6 @@
 import abc
 import numpy as np
+from tqdm import tqdm
 
 from app.models.vandermonde import Vandermonde
 
@@ -28,7 +29,7 @@ class Clustering(abc.ABC):
         a_c = np.zeros((vm.dim_a, n_cluster))
         are_valid = np.ones((n_cluster, ), dtype=bool)
 
-        for cluster in range(n_cluster):
+        for cluster in tqdm(range(n_cluster)):
             users_c = np.argwhere(users_clusters == cluster)[:, 0]
 
             if len(users_c) == 0:

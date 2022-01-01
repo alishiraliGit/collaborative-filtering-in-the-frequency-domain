@@ -20,6 +20,12 @@ def unvectorize(vec, n_col, order):
     return vec.reshape((-1, n_col), order=order)
 
 
+def e1(dim):
+    vec = np.zeros((dim,))
+    vec[0] = 1
+    return vec
+
+
 def get_ari(mat):
     a = np.sum(mat, axis=1)
     b = np.sum(mat, axis=0)

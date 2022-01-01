@@ -1,7 +1,9 @@
 import abc
 import numpy as np
 
-from app.utils.mat_ops import vectorize_rows
+from app.models.debiasing.optimumregularization import OptimumRegularization as OptReg
+from app.models.debiasing.optimumregularization import MinNoiseVarianceRegularization as MinNoiseReg
+from app.utils.mat_ops import vectorize_rows, e1
 
 
 class VandermondeType:
@@ -10,27 +12,37 @@ class VandermondeType:
     COS_MULT = 'cos_mult'
 
 
+class RegularizationType:
+    L2 = 'l2'
+    OPT = 'opt'
+    POW = 'pow'
+    MIN_NOISE_VAR = 'min_noise_var'
+
+
 class Vandermonde(abc.ABC):
-    def __init__(self, dim_x, dim_a, m, l2_lambda, vm_type):
+    def __init__(self, dim_x, dim_a, m, vm_type, reg_type: RegularizationType, reg_params=None):
         self.dim_x = dim_x
         self.dim_a = dim_a
         self.m = m
-        self.l2_lambda = l2_lambda
 
         self.v_mult = None  # [dim_a x dim_x]
         self.v_mat = None  # [dim_a x n_item]
 
         self.vm_type = vm_type
-        pass
+
+        self.reg_type = reg_type
+        self.reg_params = reg_params  # dict
+        self.c_mat = None
+        self.c_mat_is_updated = False
 
     @staticmethod
-    def get_instance(dim_x, m, l2_lambda, vm_type: VandermondeType):
+    def get_instance(dim_x, m, vm_type: VandermondeType, reg_type: RegularizationType, reg_params=None):
         if vm_type == VandermondeType.COS:
-            return VandermondeCos(dim_x, m, l2_lambda)
+            return VandermondeCos(dim_x, m, reg_type=reg_type, reg_params=reg_params)
         elif vm_type == VandermondeType.REAL:
-            return VandermondeReal(dim_x, m, l2_lambda)
+            return VandermondeReal(dim_x, m, reg_type=reg_type, reg_params=reg_params)
         elif vm_type == VandermondeType.COS_MULT:
-            return VandermondeCosMult(dim_x, m, l2_lambda)
+            return VandermondeCosMult(dim_x, m, reg_type=reg_type, reg_params=reg_params)
 
     def get_v_users(self, users, rating_mat):
         if not isinstance(users, (list, np.ndarray)):  # if users is a number only
@@ -39,15 +51,50 @@ class Vandermonde(abc.ABC):
         observed_indices = np.argwhere(~np.isnan(rating_mat[users, :]))  # order='C'
         return self.v_mat[:, observed_indices[:, 1]]
 
+    @staticmethod
+    def calc_k_hat(v_obs_mat):
+        return v_obs_mat.dot(v_obs_mat.T)/v_obs_mat.shape[1]
+
+    def update_c_mat(self):
+        if self.reg_type == RegularizationType.L2:
+            c_mat = (np.eye(self.dim_a) - np.diag(e1(self.dim_a)))*self.reg_params['l2_lambda']
+        elif self.reg_type == RegularizationType.POW:
+            z = self.reg_params['z']
+            c_mat = np.diag((z**np.array(range(self.dim_a)) - e1(self.dim_a))*self.reg_params['l2_lambda'])
+        elif self.reg_type == RegularizationType.MIN_NOISE_VAR:
+            c_mat = np.diag(MinNoiseReg(self.reg_params['bound'], self.reg_params['exclude_zero_freq']).find_c(
+                self.v_mat,
+                self.calc_k_hat(v_obs_mat=self.v_mat),
+                c_0_mat=self.c_mat
+            ))
+        elif self.reg_type == RegularizationType.OPT:
+            c_mat = np.diag(OptReg(bound=self.reg_params['bound']).find_c(
+                self.v_mat,
+                self.calc_k_hat(v_obs_mat=self.v_mat),
+            ))
+        else:
+            raise Exception('unknown regularization type!')
+
+        # Set c_mat
+        self.c_mat = c_mat
+
+        # Flag c_mat
+        self.c_mat_is_updated = True
+
+        return c_mat
+
     def calc_a_users(self, users, rating_mat):
         v_u_mat = self.get_v_users(users, rating_mat)
 
+        k_hat_mat = self.calc_k_hat(v_u_mat)
+
         s_u = vectorize_rows(users, rating_mat)
 
-        e1 = np.zeros((self.dim_a, self.dim_a))
-        e1[0, 0] = 1  # Do not regularize a_0
-        a_u = np.linalg.inv(v_u_mat.dot(v_u_mat.T) +
-                            self.l2_lambda*np.eye(self.dim_a) - self.l2_lambda*e1).dot(v_u_mat).dot(s_u)
+        # Check c_mat to be updated
+        if not self.c_mat_is_updated:
+            self.update_c_mat()
+
+        a_u = np.linalg.inv(k_hat_mat + self.c_mat).dot(v_u_mat/v_u_mat.shape[1]).dot(s_u)
 
         return a_u
 
@@ -68,7 +115,7 @@ class Vandermonde(abc.ABC):
         pass
 
     def copy(self):
-        vm = self.__class__(self.dim_x, self.m, self.l2_lambda)
+        vm = self.__class__(self.dim_x, self.m, reg_type=self.reg_type, reg_params=self.reg_params)
 
         vm.v_mult = self.v_mult.copy()
 
@@ -76,9 +123,10 @@ class Vandermonde(abc.ABC):
 
 
 class VandermondeCos(Vandermonde):
-    def __init__(self, dim_x, m, l2_lambda):
+    def __init__(self, dim_x, m, reg_type: RegularizationType, reg_params=None):
         dim_a = self.__calc_dim_a(dim_x, m)
-        Vandermonde.__init__(self, dim_x, dim_a, m, l2_lambda, vm_type=VandermondeType.COS)
+        Vandermonde.__init__(self, dim_x, dim_a, m, vm_type=VandermondeType.COS,
+                             reg_type=reg_type, reg_params=reg_params)
 
     @staticmethod
     def __calc_dim_a(dim_x, m):
@@ -113,13 +161,17 @@ class VandermondeCos(Vandermonde):
         """
         self.v_mat = np.cos(np.pi*self.v_mult.dot(x_mat))
 
+        # Flag c_mat
+        self.c_mat_is_updated = False
+
         return self.v_mat
 
 
 class VandermondeReal(Vandermonde):
-    def __init__(self, dim_x, m, l2_lambda):
+    def __init__(self, dim_x, m, reg_type: RegularizationType, reg_params=None):
         dim_a = self.__calc_dim_a(dim_x, m)
-        Vandermonde.__init__(self, dim_x, dim_a, m, l2_lambda, vm_type=VandermondeType.REAL)
+        Vandermonde.__init__(self, dim_x, dim_a, m, vm_type=VandermondeType.REAL,
+                             reg_type=reg_type, reg_params=reg_params)
 
     @staticmethod
     def __calc_dim_a(dim_x, m):
@@ -155,13 +207,17 @@ class VandermondeReal(Vandermonde):
         self.v_mat = np.concatenate((np.cos(np.pi*self.v_mult.dot(x_mat)), np.sin(np.pi*self.v_mult.dot(x_mat))),
                                     axis=0)
 
+        # Flag c_mat
+        self.c_mat_is_updated = False
+
         return self.v_mat
 
 
 class VandermondeCosMult(Vandermonde):
-    def __init__(self, dim_x, m, l2_lambda):
+    def __init__(self, dim_x, m, reg_type: RegularizationType, reg_params=None):
         dim_a = self.__calc_dim_a(dim_x, m)
-        Vandermonde.__init__(self, dim_x, dim_a, m, l2_lambda, vm_type=VandermondeType.COS_MULT)
+        Vandermonde.__init__(self, dim_x, dim_a, m, vm_type=VandermondeType.COS_MULT,
+                             reg_type=reg_type, reg_params=reg_params)
 
     @staticmethod
     def __calc_dim_a(dim_x, m):
@@ -202,5 +258,8 @@ class VandermondeCosMult(Vandermonde):
             x_i_diag = np.diag(x_mat[:, item])
 
             self.v_mat[:, item] = np.prod(np.cos(np.pi*self.v_mult.dot(x_i_diag)), axis=1)
+
+        # Flag c_mat
+        self.c_mat_is_updated = False
 
         return self.v_mat

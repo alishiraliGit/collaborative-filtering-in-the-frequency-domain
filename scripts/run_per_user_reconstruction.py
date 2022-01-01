@@ -4,7 +4,7 @@ from numpy.random import default_rng
 import os
 
 from app.utils.data_handler import load_dataset
-from app.models.vandermonde import Vandermonde, VandermondeType
+from app.models.vandermonde import Vandermonde, VandermondeType, RegularizationType
 from core.alternate import Alternate
 from app.models.clustering.one_user_one_cluster import OneUserOneCluster, OneUserOneClusterBiasCorrected
 from app.models.updating.approximate_updater import ApproximateUpdater
@@ -13,10 +13,6 @@ from app.models.updating.multi_updater_wrapper import MultiUpdaterWrapper
 from app.models.logger import Logger
 
 rng = default_rng(11)
-
-
-def estimate_l2_lambda(ratio, var_err, n_sample, var_a, dim_a):
-    return ratio * (n_sample*var_err) / (dim_a*var_a)
 
 
 def get_bfgs_settings():
@@ -30,19 +26,22 @@ def get_bfgs_settings():
     sett['dim_x'] = 1
     sett['m'] = 2
     sett['vm_type'] = VandermondeType.COS_MULT
+    # sett['reg_type'] = RegularizationType.L2
+    # sett['reg_params'] = {'l2_lambda': 0.5}
+    sett['reg_type'] = RegularizationType.MIN_NOISE_VAR
+    sett['reg_params'] = {'bound': (0, 0.5), 'exclude_zero_freq': False}
+    # sett['reg_type'] = RegularizationType.POW
+    # sett['reg_params'] = {'l2_lambda': 0.5, 'z': 1}
 
     # Clustering settings
     sett['n_iter_alpha'] = 1
-    sett['estimate_sigma_n'] = True
+    sett['estimate_sigma_n'] = False
     sett['sigma_n'] = 0
     sett['min_alpha'] = 0
 
     # Updater settings
     sett['gamma'] = 1  # default: 1
     sett['max_iter'] = 5  # default: 5
-
-    # Regularization coefficients
-    sett['l2_lambda'] = 10  # default: 1000
 
     return sett
 
@@ -91,8 +90,9 @@ if __name__ == '__main__':
     vm = Vandermonde.get_instance(
         dim_x=settings['dim_x'],
         m=settings['m'],
-        l2_lambda=settings['l2_lambda'],
-        vm_type=settings['vm_type']
+        vm_type=settings['vm_type'],
+        reg_type=settings['reg_type'],
+        reg_params=settings['reg_params']
     )
 
     #  Init. "x"
@@ -105,6 +105,7 @@ if __name__ == '__main__':
         sigma_n=settings['sigma_n'],
         min_alpha=settings['min_alpha']
     )
+    # one_user_one_cluster = OneUserOneCluster()
 
     # Init. updaters
     approx_upd = ApproximateUpdater(x_mat_0=x_mat_0,
