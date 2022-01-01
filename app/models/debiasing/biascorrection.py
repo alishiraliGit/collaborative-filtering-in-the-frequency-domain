@@ -3,7 +3,7 @@ from scipy.optimize import minimize_scalar
 
 from app.models.vandermonde import Vandermonde, RegularizationType
 from app.models.debiasing.optimumregularization import OptimumRegularization as OptReg
-from app.utils.mat_ops import e1
+from app.utils.mat_ops import e1, vectorize_rows
 
 
 class FirstOrderBiasCorrection:
@@ -63,48 +63,49 @@ class FirstOrderBiasCorrection:
         return obj.x
 
     @staticmethod
-    def calc_bias(v_mat, obs_mask, alpha, sigma_n, c_mat):
-        v_obs_mat = v_mat[:, obs_mask]
-
-        k_mat = Vandermonde.calc_k_hat(v_obs_mat)
-
+    def calc_bias(v_mat, k_mat, alpha, sigma_n, c_mat):
         v_mean = np.mean(v_mat, axis=1).reshape((-1, 1))
 
         bias = np.linalg.inv(k_mat + c_mat).dot(v_mean)*(sigma_n**2)*alpha
 
         return bias[:, 0]
 
-    def debias(self, vm: Vandermonde, a, r):
-        obs_mask = ~np.isnan(r)
+    def debias(self, vm: Vandermonde, a, r_mat):
+        n_user = r_mat.shape[0]
 
-        # Calc k_hat
-        v_obs_mat = vm.v_mat[:, obs_mask]
-        k_mat = Vandermonde.calc_k_hat(v_obs_mat)
+        obs_mask = ~np.isnan(r_mat)
 
         # Estimate p_0
         p_0_hat = np.mean(obs_mask*1)
+
+        # Calc. k_mat
+        k_mat = vm.calc_k_hat(vm.get_v_users(range(n_user), r_mat))
 
         # Init.
         a_un = a
         for _ in range(self.n_iter):
             # --- Estimate alpha ---
             # Predict ratings
-            r_hat = vm.predict(a_un.reshape((-1, 1)))[0]
+            a_un_mat = np.tile(a_un.reshape((-1, 1)), reps=(1, n_user))
+            r_hat_mat = vm.predict(a_un_mat)
 
             # Estimate sigma_n
             if self.estimate_sigma_n:
-                sigma_n = np.std(r_hat[obs_mask] - r[obs_mask])
+                sigma_n = np.std(r_hat_mat[obs_mask] - r_mat[obs_mask])
             else:
                 sigma_n = self.sigma_n
 
             # Fill known ratings
-            r_hat[obs_mask] = r[obs_mask]
+            r_hat_mat[obs_mask] = r_mat[obs_mask]
 
             # Find alpha
-            alpha_hat = self.find_alpha(r_hat, obs_mask, p_0_hat, min_alpha=self.min_alpha, max_alpha=self.max_alpha)
+            alpha_hat = self.find_alpha(vectorize_rows(range(n_user), r_hat_mat)[:, 0],
+                                        vectorize_rows(range(n_user), obs_mask)[:, 0],
+                                        p_0_hat,
+                                        min_alpha=self.min_alpha, max_alpha=self.max_alpha)
 
             # --- Estimate bias ---
-            bias = self.calc_bias(vm.v_mat, obs_mask, alpha_hat, sigma_n, vm.c_mat)
+            bias = self.calc_bias(vm.v_mat, k_mat, alpha_hat, sigma_n, vm.c_mat)
 
             # --- Update a_un ---
             a_un = a - bias

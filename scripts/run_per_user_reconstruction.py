@@ -15,7 +15,7 @@ from app.models.logger import Logger
 rng = default_rng(11)
 
 
-def get_bfgs_settings():
+def get_approx_bfgs_settings():
     sett = {}
 
     method = 'bfgs'
@@ -26,16 +26,16 @@ def get_bfgs_settings():
     sett['dim_x'] = 1
     sett['m'] = 2
     sett['vm_type'] = VandermondeType.COS_MULT
-    # sett['reg_type'] = RegularizationType.L2
-    # sett['reg_params'] = {'l2_lambda': 0.5}
-    sett['reg_type'] = RegularizationType.MIN_NOISE_VAR
-    sett['reg_params'] = {'bound': (0, 0.5), 'exclude_zero_freq': False}
+    sett['reg_type'] = RegularizationType.L2
+    sett['reg_params'] = {'l2_lambda': 0.5}
+    # sett['reg_type'] = RegularizationType.MIN_NOISE_VAR
+    # sett['reg_params'] = {'bound': (0, 0.5), 'exclude_zero_freq': False}
     # sett['reg_type'] = RegularizationType.POW
     # sett['reg_params'] = {'l2_lambda': 0.5, 'z': 1}
 
     # Clustering settings
     sett['n_iter_alpha'] = 1
-    sett['estimate_sigma_n'] = False
+    sett['estimate_sigma_n'] = True
     sett['sigma_n'] = 0
     sett['min_alpha'] = 0
 
@@ -51,7 +51,7 @@ if __name__ == '__main__':
 
     # ------- Settings -------
     # Method settings
-    settings = get_bfgs_settings()
+    settings = get_approx_bfgs_settings()
 
     print(settings)
 

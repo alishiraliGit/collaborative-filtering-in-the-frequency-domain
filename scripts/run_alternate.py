@@ -3,48 +3,16 @@ from numpy.random import default_rng
 import os
 
 from app.utils.data_handler import load_dataset
-from app.models.vandermonde import Vandermonde, VandermondeType
+from app.models.vandermonde import Vandermonde, VandermondeType, RegularizationType
 from core.alternate import Alternate
-from app.models.clustering.kmeans import KMeans
+from app.models.clustering.kmeans import KMeans, KMeansBiasCorrected
 from app.models.clustering.boosting import Boosting
 from app.models.updating.approximate_updater import ApproximateUpdater
 from app.models.updating.bfgs import BFGS
 from app.models.updating.multi_updater_wrapper import MultiUpdaterWrapper
 from app.models.logger import Logger
 
-
-def estimate_l2_lambda(ratio, std_err, n_eq, std_est, n_est):
-    return ratio * (std_err*n_eq) / (n_est*std_est)
-
-
-def get_kmeans_approx_settings():
-    sett = {}
-
-    method = 'kmeans_approx'
-
-    sett['method'] = method
-
-    # Vandermonde settings
-    sett['dim_x'] = 3
-    sett['m'] = 4
-    sett['l2_lambda_ratio'] = 0.01
-
-    # Clustering settings
-    sett['n_cluster'] = 5
-    sett['cls_init_std'] = 0.1
-
-    # Updater settings
-    sett['gamma'] = 0.1
-
-    # Estimate regularization coefficients
-    sett['l2_lambda'] = estimate_l2_lambda(ratio=sett['l2_lambda_ratio'],
-                                           std_err=1,
-                                           n_eq=8e4 / sett['n_cluster'],
-                                           std_est=sett['cls_init_std'],
-                                           n_est=(sett['m'] + 1) ** sett['dim_x'])
-    sett['l2_lambda_cls'] = 0
-
-    return sett
+rng = default_rng(1)
 
 
 def get_boosted_kmeans_approx_settings():
@@ -71,67 +39,6 @@ def get_boosted_kmeans_approx_settings():
 
     # Estimate regularization coefficients
     sett['l2_lambda'] = 0
-    sett['l2_lambda_cls'] = 0
-
-    return sett
-
-
-def get_kmeans_ls_settings():
-    sett = {}
-
-    method = 'kmeans_ls'
-
-    sett['method'] = method
-
-    # Vandermonde settings
-    sett['dim_x'] = 3
-    sett['m'] = 5
-    sett['l2_lambda_ratio'] = 0.01
-
-    # Clustering settings
-    sett['n_cluster'] = 5
-    sett['cls_init_std'] = 0.1
-
-    # Updater settings
-    sett['max_nfev'] = 5
-
-    # Estimate regularization coefficients
-    sett['l2_lambda'] = estimate_l2_lambda(ratio=sett['l2_lambda_ratio'],
-                                           std_err=1,
-                                           n_eq=8e4 / sett['n_cluster'],
-                                           std_est=sett['cls_init_std'],
-                                           n_est=(sett['m'] + 1) ** sett['dim_x'])
-    sett['l2_lambda_cls'] = 0
-
-    return sett
-
-
-def get_kmeans_approx_ls_settings():
-    sett = {}
-
-    method = 'kmeans_approx_ls'
-
-    sett['method'] = method
-
-    # Vandermonde settings
-    sett['dim_x'] = 3
-    sett['m'] = 5
-    sett['l2_lambda_ratio'] = 0.01
-
-    # Clustering settings
-    sett['n_cluster'] = 5
-    sett['cls_init_std'] = 0.1
-
-    # Updater settings
-    sett['gamma'] = 0.3
-    sett['max_nfev'] = 5
-
-    # Estimate regularization coefficients
-    sett['l2_lambda'] = estimate_l2_lambda(ratio=sett['l2_lambda_ratio'],
-                                           std_err=1,
-                                           n_eq=8e4 / sett['n_cluster'],
-                                           std_est=sett['cls_init_std'],
-                                           n_est=(sett['m'] + 1) ** sett['dim_x'])
     sett['l2_lambda_cls'] = 0
 
     return sett
@@ -173,21 +80,26 @@ def get_kmeans_approx_bfgs_settings():
     sett['method'] = method
 
     # Vandermonde settings
-    sett['dim_x'] = 3
-    sett['m'] = 4
+    sett['dim_x'] = 1
+    sett['m'] = 3
     sett['vm_type'] = VandermondeType.COS_MULT
+    sett['reg_type'] = RegularizationType.L2
+    sett['reg_params'] = {'l2_lambda': 0.5}
+    # sett['reg_type'] = RegularizationType.MIN_NOISE_VAR
+    # sett['reg_params'] = {'bound': (0, 0.5), 'exclude_zero_freq': True}
 
     # Clustering settings
-    sett['n_cluster'] = 7
+    sett['n_cluster'] = 15
     sett['cls_init_std'] = 0.1
+
+    sett['n_iter_alpha'] = 1
+    sett['estimate_sigma_n'] = False
+    sett['sigma_n'] = 0
+    sett['min_alpha'] = 0
 
     # Updater settings
     sett['gamma'] = 1
     sett['max_iter_bfgs'] = 5
-
-    # Regularization coefficients
-    sett['l2_lambda'] = 100
-    sett['l2_lambda_cls'] = 0
 
     return sett
 
@@ -224,61 +136,74 @@ def get_boosted_kmeans_approx_bfgs_settings():
 if __name__ == '__main__':
     # ------- Settings -------
     # Method
-    settings = get_boosted_kmeans_approx_bfgs_settings()
+    settings = get_kmeans_approx_bfgs_settings()
 
     print(settings)
 
     # General
     do_plot = True
+    do_save = False
 
     # Path
-    load_path = os.path.join('..', 'data', 'monday_offers')
+    load_path = os.path.join('..', 'data', 'coat')
 
     save_path = os.path.join('..', 'results')
     os.makedirs(save_path, exist_ok=True)
 
     # Dataset
-    dataset_name = 'monday_offers'
-    min_value = 0
-    max_value = 1
+    dataset_name = 'coat'
+    min_value = 1
+    max_value = 5
 
     # Cross-validation
-    test_split = 0.1
-    val_split = 0.1 / (1 - test_split)
+    # test_split = 0.1
+    val_split = 0.1
 
     # Item-based (True) or user-based
     do_transpose = False
 
     # Alternation
-    n_alter = 10
+    n_alter = 20
 
     # ------- Load data -------
     rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item = \
-        load_dataset(load_path, dataset_name, te_split=test_split, va_split=val_split, do_transpose=do_transpose)
+        load_dataset(load_path, dataset_name, va_split=val_split, do_transpose=do_transpose)
 
     print('Data loaded ...')
 
     # ------- Initialization -------
-    rng = default_rng(1)
-
     #  Init. Vandermonde
-    vm = Vandermonde.get_instance(dim_x=settings['dim_x'],
-                                  m=settings['m'],
-                                  l2_lambda=settings['l2_lambda'],
-                                  vm_type=settings['vm_type'])
+    vm = Vandermonde.get_instance(
+        dim_x=settings['dim_x'],
+        m=settings['m'],
+        vm_type=settings['vm_type'],
+        reg_type=settings['reg_type'],
+        reg_params=settings['reg_params']
+    )
 
     #  Init. "x" and "a_c"
     x_mat_0 = rng.random((settings['dim_x'], n_item))
     a_c_mat_0 = rng.normal(loc=0, scale=settings['cls_init_std'], size=(vm.dim_a, settings['n_cluster']))
 
     #  Init. clustering
-    kmeans = KMeans(n_cluster=settings['n_cluster'],
-                    a_c_mat_0=a_c_mat_0,
-                    l2_lambda=settings['l2_lambda_cls'])
+    # kmeans = KMeans(
+    #    n_cluster=settings['n_cluster'],
+    #    a_c_mat_0=a_c_mat_0
+    # )
+    kmeans_bc = KMeansBiasCorrected(
+        n_cluster=settings['n_cluster'],
+        a_c_mat_0=a_c_mat_0,
+        n_iter=settings['n_iter_alpha'],
+        estimate_sigma_n=settings['estimate_sigma_n'],
+        sigma_n=settings['sigma_n'],
+        min_alpha=settings['min_alpha']
+    )
 
-    boost = Boosting(cls=kmeans,
-                     n_learner=settings['n_learner'],
-                     n_iter_cls=settings['n_iter_cls'])
+    # boost = Boosting(
+    #    cls=kmeans,
+    #    n_learner=settings['n_learner'],
+    #    n_iter_cls=settings['n_iter_cls']
+    # )
 
     # Init. updaters
     approx_upd = ApproximateUpdater(x_mat_0=x_mat_0,
@@ -290,7 +215,7 @@ if __name__ == '__main__':
     multi_upd = MultiUpdaterWrapper(upds=[approx_upd, bfgs_upd])
 
     # Init. alternate
-    alt = Alternate(cls=boost, upd=multi_upd)
+    alt = Alternate(cls=kmeans_bc, upd=multi_upd)
 
     # Init. logger
     logger = Logger(settings=settings, save_path=save_path, do_plot=do_plot)
@@ -312,10 +237,11 @@ if __name__ == '__main__':
           (int(best_iter), logger.rmse_tr[best_iter], logger.rmse_va[best_iter], logger.rmse_te[best_iter]))
 
     # ------- Save the results -------
-    logger.save(ext={
-        'x_mat': alt.upd.x_mat,
-        'a_mat': a_mat,
-        'rating_mat_tr': rating_mat_tr,
-        'rating_mat_va': rating_mat_va,
-        'rating_mat_te': rating_mat_te,
-    })
+    if do_save:
+        logger.save(ext={
+            'x_mat': alt.upd.x_mat,
+            'a_mat': a_mat,
+            'rating_mat_tr': rating_mat_tr,
+            'rating_mat_va': rating_mat_va,
+            'rating_mat_te': rating_mat_te,
+        })

@@ -47,18 +47,18 @@ class OneUserOneClusterBiasCorrected(OneUserOneCluster):
         a_c_mat_new, are_valid = self.calc_a_clusters(self.users_clusters, vm, rating_mat, self.n_cluster)
         assert np.all(are_valid)
 
+        # Save the "a" of new clusters
+        self.a_c_mat = a_c_mat_new.copy()
+
+        # Debiasing
         if is_test:
-            # Debiasing
             for cls in tqdm(range(self.n_cluster), disable=not verbose):
                 a = a_c_mat_new[:, cls]
-                r = rating_mat[cls]
+                r_cls_mat = rating_mat[cls:cls + 1]
 
-                a_c_mat_new[:, cls] = self.debiaser.debias(vm, a, r)
+                a_c_mat_new[:, cls] = self.debiaser.debias(vm, a, r_cls_mat)
 
-        # Save the "a" of new clusters
-        self.a_c_mat = a_c_mat_new
-
-        return self.a_c_mat, self.users_clusters
+        return a_c_mat_new, self.users_clusters
 
     def copy(self, _do_init):
         return OneUserOneClusterBiasCorrected(

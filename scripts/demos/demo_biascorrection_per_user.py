@@ -22,7 +22,7 @@ if __name__ == '__main__':
     # VM
     _dim_x = 1
     _m = 3
-    _l2_lambda = 0
+    _l2_lambda = 0.5
 
     # Data simulation
     _simul_sett = {
