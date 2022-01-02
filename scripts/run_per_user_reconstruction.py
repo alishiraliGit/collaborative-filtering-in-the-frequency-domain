@@ -26,10 +26,10 @@ def get_approx_bfgs_settings():
     sett['dim_x'] = 1
     sett['m'] = 2
     sett['vm_type'] = VandermondeType.COS_MULT
-    sett['reg_type'] = RegularizationType.L2
-    sett['reg_params'] = {'l2_lambda': 0.5}
-    # sett['reg_type'] = RegularizationType.MIN_NOISE_VAR
-    # sett['reg_params'] = {'bound': (0, 0.5), 'exclude_zero_freq': False}
+    # sett['reg_type'] = RegularizationType.L2
+    # sett['reg_params'] = {'l2_lambda': 1, 'exclude_zero_freq': True}
+    sett['reg_type'] = RegularizationType.MAX_SNR
+    sett['reg_params'] = {'bound': (0, 1), 'exclude_zero_freq': True}
     # sett['reg_type'] = RegularizationType.POW
     # sett['reg_params'] = {'l2_lambda': 0.5, 'z': 1}
 
@@ -131,7 +131,8 @@ if __name__ == '__main__':
     # ------- Do the alternation -------
     a_mat = alt.run(vm, rating_mat_tr, rating_mat_va, n_alter, min_value, max_value,
                     rating_mat_te=rating_mat_te,
-                    logger=logger)
+                    logger=logger,
+                    verbose=True)
 
     # ------- Print the best validated result -------
     best_iter = np.argmin(logger.rmse_va)

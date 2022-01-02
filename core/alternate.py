@@ -13,12 +13,13 @@ class Alternate:
 
     def run(self, vm: Vandermonde, rating_mat_tr, rating_mat_va, n_iter, min_val, max_val,
             rating_mat_te=None,
-            logger: Logger=None):
+            logger: Logger=None,
+            verbose=False):
 
         a_mat_opt = None
         for it in range(n_iter):
             # Do clustering
-            a_c_mat, users_clusters = self.cls.fit_transform(vm, rating_mat_tr)
+            a_c_mat, users_clusters = self.cls.fit_transform(vm, rating_mat_tr, verbose=verbose)
             a_mat = a_c_mat[:, users_clusters]
 
             if rating_mat_te is not None:

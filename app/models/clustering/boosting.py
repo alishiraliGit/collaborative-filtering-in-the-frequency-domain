@@ -38,7 +38,7 @@ class Boosting(Clustering):
 
         return
 
-    def transform(self, vm: Vandermonde, rating_mat):
+    def transform(self, vm: Vandermonde, rating_mat, **_kwargs):
         n_user = self.a_mat.shape[1]
         pseudo_users_clusters = list(range(n_user))
         return self.a_mat, pseudo_users_clusters

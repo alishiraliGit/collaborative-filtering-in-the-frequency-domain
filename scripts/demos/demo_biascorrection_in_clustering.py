@@ -17,7 +17,7 @@ def miss_not_at_random(r, p_0, alpha):
     return observe_mask, observe_indices
 
 
-def simulate_mnar_data(n_user, n_item, dim_x, m, p_0, alpha, sigma_n):
+def simulate_mnar_data(n_user, n_item, dim_x, m, p_0, alpha, sigma_n, z=1):
     # ----- Init. a VM -----
     vm = Vandermonde.get_instance(
         dim_x=dim_x,
@@ -30,7 +30,8 @@ def simulate_mnar_data(n_user, n_item, dim_x, m, p_0, alpha, sigma_n):
     # ----- Simulate ground truth ratings -----
     # Random init.
     x_mat = rng.random((dim_x, n_item))
-    a_mat = rng.normal(loc=0, scale=1, size=(vm.dim_a, n_user))
+    a_mat = rng.normal(loc=0, scale=1, size=(vm.dim_a, n_user)) \
+        * z**np.tile(np.array(range(vm.dim_a)).reshape((-1, 1)), reps=(1, n_user))
 
     # Predict
     vm.transform(x_mat)

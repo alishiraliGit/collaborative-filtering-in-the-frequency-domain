@@ -25,11 +25,11 @@ class Clustering(abc.ABC):
         pass
 
     @staticmethod
-    def calc_a_clusters(users_clusters, vm: Vandermonde, rating_mat, n_cluster):
+    def calc_a_clusters(users_clusters, vm: Vandermonde, rating_mat, n_cluster, verbose=False):
         a_c = np.zeros((vm.dim_a, n_cluster))
         are_valid = np.ones((n_cluster, ), dtype=bool)
 
-        for cluster in tqdm(range(n_cluster)):
+        for cluster in tqdm(range(n_cluster), disable=not verbose, desc='calc_a_clusters'):
             users_c = np.argwhere(users_clusters == cluster)[:, 0]
 
             if len(users_c) == 0:

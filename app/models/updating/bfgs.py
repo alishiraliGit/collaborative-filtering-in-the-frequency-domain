@@ -19,7 +19,7 @@ class BFGS(Updater):
 
         bounds = Bounds(lb=0, ub=1)
 
-        for item in tqdm(range(n_item)):
+        for item in tqdm(range(n_item), desc='fit (bfgs)'):
             x_0_i_vec = self.x_mat[:, item]
 
             res = minimize(fun=BFGS.loss_jac_i,

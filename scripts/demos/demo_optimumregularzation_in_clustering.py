@@ -2,7 +2,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from app.models.vandermonde import Vandermonde, VandermondeType, RegularizationType
-from app.models.clustering.one_user_one_cluster import OneUserOneCluster, OneUserOneClusterBiasCorrected
+from app.models.clustering.one_user_one_cluster import OneUserOneCluster
 from core.alternate import Alternate
 from demo_biascorrection_in_clustering import simulate_mnar_data
 
@@ -13,25 +13,26 @@ if __name__ == '__main__':
     # ----- Settings -----
     # Data simulation
     _n_user = 300
-    _n_item = 300
+    _n_item = 50
 
     _dim_x = 1
     _m = 2
 
     _simul_sett = {
-        'p_0': 0.2,
-        'alpha': 0.2,
-        'sigma_n': 0.5,
+        'p_0': 0.4,
+        'alpha': 0,
+        'sigma_n': 1,
+        'z': 0.8
     }
 
     # Regularization
     _reg_type_1 = RegularizationType.L2
-    _reg_params_1 = {'l2_lambda': 0.5}
+    _reg_params_1 = {'l2_lambda': 0.3, 'exclude_zero_freq': True}
 
-    # _reg_type_2 = RegularizationType.MIN_NOISE_VAR
-    # _reg_params_2 = {'bound': (0, 0.5), 'exclude_zero_freq': True}
-    _reg_type_2 = RegularizationType.POW
-    _reg_params_2 = {'l2_lambda': 0.43, 'z': 1.1}
+    _reg_type_2 = RegularizationType.MAX_SNR
+    _reg_params_2 = {'bound': (0.2, 0.3), 'exclude_zero_freq': True}
+    # _reg_type_2 = RegularizationType.POW
+    # _reg_params_2 = {'l2_lambda': 0.43, 'z': 1.1}
 
     # ----- Init. -----
     # VM
@@ -63,8 +64,8 @@ if __name__ == '__main__':
     _vm_1.transform(_x_mat)
     _vm_2.transform(_x_mat)
 
-    _a_hat_mat_1, _ = _cls.fit_transform(vm=_vm_1, rating_mat=_r_obs_mat)
-    _a_hat_mat_2, _ = _cls.fit_transform(vm=_vm_2, rating_mat=_r_obs_mat)
+    _a_hat_mat_1, _ = _cls.fit_transform(vm=_vm_1, rating_mat=_r_obs_mat, verbose=True)
+    _a_hat_mat_2, _ = _cls.fit_transform(vm=_vm_2, rating_mat=_r_obs_mat, verbose=True)
 
     # ----- Results -----
     # RMSE
@@ -77,10 +78,12 @@ if __name__ == '__main__':
     plt.figure(figsize=(4, 4))
     plt.plot(np.mean((_a_mat - _a_hat_mat_1)**2, axis=1), 'k')
     plt.plot(np.mean((_a_mat - _a_hat_mat_2)**2, axis=1), 'r')
+    plt.plot(np.mean(_a_hat_mat_1**2, axis=1), 'k--')
+    plt.plot(np.mean(_a_hat_mat_2**2, axis=1), 'r--')
+    plt.plot(np.mean(_a_mat**2, axis=1), 'b')
 
     # Compare c_mats
     print('c_mat of reg. 1:')
     print(np.diag(_vm_1.c_mat))
     print('c_mat of reg. 2:')
     print(np.diag(_vm_2.c_mat))
-

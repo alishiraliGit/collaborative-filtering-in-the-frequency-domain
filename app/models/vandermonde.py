@@ -1,8 +1,8 @@
 import abc
 import numpy as np
 
-from app.models.debiasing.optimumregularization import OptimumRegularization as OptReg
 from app.models.debiasing.optimumregularization import MinNoiseVarianceRegularization as MinNoiseReg
+from app.models.debiasing.optimumregularization import MaxSNRRegularization as MaxSNRReg
 from app.utils.mat_ops import vectorize_rows, e1
 
 
@@ -17,6 +17,7 @@ class RegularizationType:
     OPT = 'opt'
     POW = 'pow'
     MIN_NOISE_VAR = 'min_noise_var'
+    MAX_SNR = 'max_snr'
 
 
 class Vandermonde(abc.ABC):
@@ -34,6 +35,8 @@ class Vandermonde(abc.ABC):
         self.reg_params = reg_params  # dict
         self.c_mat = None
         self.c_mat_is_updated = False
+        # ToDo
+        self.tmp = []
 
     @staticmethod
     def get_instance(dim_x, m, vm_type: VandermondeType, reg_type: RegularizationType, reg_params=None):
@@ -55,31 +58,36 @@ class Vandermonde(abc.ABC):
     def calc_k_hat(v_obs_mat):
         return v_obs_mat.dot(v_obs_mat.T)/v_obs_mat.shape[1]
 
-    def update_c_mat(self):
+    def update_c_mat(self, a=None):
+        # Flag c_mat
+        self.c_mat_is_updated = True
+
         if self.reg_type == RegularizationType.L2:
-            c_mat = (np.eye(self.dim_a) - np.diag(e1(self.dim_a)))*self.reg_params['l2_lambda']
+            e1_mat = np.diag(e1(self.dim_a))*(self.reg_params['exclude_zero_freq']*1)
+            c_mat = (np.eye(self.dim_a) - e1_mat)*self.reg_params['l2_lambda']
         elif self.reg_type == RegularizationType.POW:
             z = self.reg_params['z']
-            c_mat = np.diag((z**np.array(range(self.dim_a)) - e1(self.dim_a))*self.reg_params['l2_lambda'])
+            e1_mat = np.diag(e1(self.dim_a)) * (self.reg_params['exclude_zero_freq']*1)
+            c_mat = np.diag((z**np.array(range(self.dim_a)) - e1_mat)*self.reg_params['l2_lambda'])
         elif self.reg_type == RegularizationType.MIN_NOISE_VAR:
             c_mat = np.diag(MinNoiseReg(self.reg_params['bound'], self.reg_params['exclude_zero_freq']).find_c(
                 self.v_mat,
                 self.calc_k_hat(v_obs_mat=self.v_mat),
                 c_0_mat=self.c_mat
             ))
-        elif self.reg_type == RegularizationType.OPT:
-            c_mat = np.diag(OptReg(bound=self.reg_params['bound']).find_c(
+        elif self.reg_type == RegularizationType.MAX_SNR:
+            c_mat = np.diag(MaxSNRReg(self.reg_params['bound'], self.reg_params['exclude_zero_freq']).find_c(
+                a,
                 self.v_mat,
                 self.calc_k_hat(v_obs_mat=self.v_mat),
+                c_0_mat=self.c_mat
             ))
+            self.c_mat_is_updated = False
         else:
             raise Exception('unknown regularization type!')
 
         # Set c_mat
         self.c_mat = c_mat
-
-        # Flag c_mat
-        self.c_mat_is_updated = True
 
         return c_mat
 
@@ -92,7 +100,20 @@ class Vandermonde(abc.ABC):
 
         # Check c_mat to be updated
         if not self.c_mat_is_updated:
-            self.update_c_mat()
+            if self.reg_type == RegularizationType.MAX_SNR:
+                vm_0 = self.copy()
+                vm_0.v_mat = self.v_mat
+                vm_0.reg_type = RegularizationType.L2
+                vm_0.reg_params = {
+                    'l2_lambda': self.reg_params['bound'][1],
+                    'exclude_zero_freq': self.reg_params['exclude_zero_freq']
+                }
+                a_0 = vm_0.calc_a_users(users, rating_mat)
+                self.update_c_mat(a_0[:, 0])
+                # ToDo
+                self.tmp.append(np.diag(self.c_mat).reshape((1, -1)))
+            else:
+                self.update_c_mat()
 
         a_u = np.linalg.inv(k_hat_mat + self.c_mat).dot(v_u_mat/v_u_mat.shape[1]).dot(s_u)
 

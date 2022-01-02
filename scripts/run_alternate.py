@@ -84,12 +84,12 @@ def get_kmeans_approx_bfgs_settings():
     sett['m'] = 3
     sett['vm_type'] = VandermondeType.COS_MULT
     sett['reg_type'] = RegularizationType.L2
-    sett['reg_params'] = {'l2_lambda': 0.5}
+    sett['reg_params'] = {'l2_lambda': 0.1}
     # sett['reg_type'] = RegularizationType.MIN_NOISE_VAR
     # sett['reg_params'] = {'bound': (0, 0.5), 'exclude_zero_freq': True}
 
     # Clustering settings
-    sett['n_cluster'] = 15
+    sett['n_cluster'] = 10
     sett['cls_init_std'] = 0.1
 
     sett['n_iter_alpha'] = 1

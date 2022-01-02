@@ -22,9 +22,10 @@ class OneUserOneCluster(Clustering):
 
         return self
 
-    def transform(self, vm: Vandermonde, rating_mat, **_kwargs):
+    def transform(self, vm: Vandermonde, rating_mat, verbose=False, **_kwargs):
         # Calc. "a" of new clusters
-        a_c_mat_new, are_valid = self.calc_a_clusters(self.users_clusters, vm, rating_mat, self.n_cluster)
+        a_c_mat_new, are_valid = \
+            self.calc_a_clusters(self.users_clusters, vm, rating_mat, self.n_cluster, verbose=verbose)
         assert np.all(are_valid)
 
         # Save the "a" of new clusters
@@ -44,7 +45,8 @@ class OneUserOneClusterBiasCorrected(OneUserOneCluster):
 
     def transform(self, vm: Vandermonde, rating_mat, verbose=False, is_test=False, **_kwargs):
         # Calc. "a" of new clusters
-        a_c_mat_new, are_valid = self.calc_a_clusters(self.users_clusters, vm, rating_mat, self.n_cluster)
+        a_c_mat_new, are_valid = \
+            self.calc_a_clusters(self.users_clusters, vm, rating_mat, self.n_cluster, verbose=verbose)
         assert np.all(are_valid)
 
         # Save the "a" of new clusters

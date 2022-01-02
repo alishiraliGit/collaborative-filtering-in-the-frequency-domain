@@ -1,9 +1,8 @@
 import numpy as np
 from scipy.optimize import minimize_scalar
 
-from app.models.vandermonde import Vandermonde, RegularizationType
-from app.models.debiasing.optimumregularization import OptimumRegularization as OptReg
-from app.utils.mat_ops import e1, vectorize_rows
+from app.models.vandermonde import Vandermonde
+from app.utils.mat_ops import vectorize_rows
 
 
 class FirstOrderBiasCorrection:
