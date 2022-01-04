@@ -24,18 +24,18 @@ def get_approx_bfgs_settings():
 
     # Vandermonde settings
     sett['dim_x'] = 1
-    sett['m'] = 2
+    sett['m'] = 3
     sett['vm_type'] = VandermondeType.COS_MULT
     # sett['reg_type'] = RegularizationType.L2
-    # sett['reg_params'] = {'l2_lambda': 1, 'exclude_zero_freq': True}
-    sett['reg_type'] = RegularizationType.MAX_SNR
-    sett['reg_params'] = {'bound': (0, 1), 'exclude_zero_freq': True}
+    # sett['reg_params'] = {'l2_lambda': 0.8, 'exclude_zero_freq': True}
+    sett['reg_type'] = RegularizationType.POST_MAX_SNR
+    sett['reg_params'] = {'bound': (0, 0.2), 'exclude_zero_freq': False}
     # sett['reg_type'] = RegularizationType.POW
-    # sett['reg_params'] = {'l2_lambda': 0.5, 'z': 1}
+    # sett['reg_params'] = {'l2_lambda': 0.2, 'z': 1.5, 'exclude_zero_freq': True}
 
     # Clustering settings
     sett['n_iter_alpha'] = 1
-    sett['estimate_sigma_n'] = True
+    sett['estimate_sigma_n'] = False
     sett['sigma_n'] = 0
     sett['min_alpha'] = 0
 

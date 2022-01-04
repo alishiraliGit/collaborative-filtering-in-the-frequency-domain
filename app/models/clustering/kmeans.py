@@ -2,7 +2,7 @@ import numpy as np
 from tqdm import tqdm
 
 from app.models.clustering.clustering_base import Clustering
-from app.models.vandermonde import Vandermonde
+from app.models.vandermonde import Vandermonde, RegularizationType
 from app.models.debiasing.biascorrection import FirstOrderBiasCorrection
 from app.utils.mat_ops import vectorize_rows
 
@@ -65,17 +65,18 @@ class KMeansBiasCorrected(KMeans):
 
     def transform(self, vm: Vandermonde, rating_mat, verbose=False, is_test=False, **_kwargs):
         # Calc. "a" of new clusters
-        a_c_mat_new, are_valid = Clustering.calc_a_clusters(self.users_clusters, vm, rating_mat, self.n_cluster)
+        a_c_mat_new, are_valid = \
+            Clustering.calc_a_clusters(self.users_clusters, vm, rating_mat, self.n_cluster, verbose=verbose)
 
         # Replace empty clusters with previous values
         a_c_mat_new[:, ~are_valid] = self.a_c_mat[:, ~are_valid]
 
         # Save the "a" of new clusters in the object
-        self.a_c_mat = a_c_mat_new.copy()
-
-        # Debiasing
-        if is_test:
-            for cls in tqdm(range(self.n_cluster), disable=not verbose):
+        if not is_test:
+            self.a_c_mat = a_c_mat_new
+        else:
+            # Debiasing
+            for cls in tqdm(range(self.n_cluster), disable=not verbose, desc='KMeansBC:transform:debiasing'):
                 if not are_valid[cls]:
                     continue
 
@@ -84,7 +85,17 @@ class KMeansBiasCorrected(KMeans):
                 users_c = np.argwhere(self.users_clusters == cls)[:, 0]
                 r_cls_mat = rating_mat[users_c]
 
+                # Update c_mat if required
+                if vm.reg_type == RegularizationType.POST_MAX_SNR:
+                    vm.update_c_mat(a, is_test=True)
+
+                    vm.c_mat_is_updated = True
+
+                    a = vm.calc_a_users(users_c, rating_mat)[:, 0]
+
                 a_c_mat_new[:, cls] = self.debiaser.debias(vm, a, r_cls_mat)
+
+            vm.c_mat_is_updated = False
 
         return a_c_mat_new, self.users_clusters
 

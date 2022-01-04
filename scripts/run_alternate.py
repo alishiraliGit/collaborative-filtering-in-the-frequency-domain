@@ -80,16 +80,16 @@ def get_kmeans_approx_bfgs_settings():
     sett['method'] = method
 
     # Vandermonde settings
-    sett['dim_x'] = 1
-    sett['m'] = 3
+    sett['dim_x'] = 2
+    sett['m'] = 5
     sett['vm_type'] = VandermondeType.COS_MULT
     sett['reg_type'] = RegularizationType.L2
-    sett['reg_params'] = {'l2_lambda': 0.1}
-    # sett['reg_type'] = RegularizationType.MIN_NOISE_VAR
-    # sett['reg_params'] = {'bound': (0, 0.5), 'exclude_zero_freq': True}
+    sett['reg_params'] = {'l2_lambda': 0.2, 'exclude_zero_freq': False}
+    # sett['reg_type'] = RegularizationType.POST_MAX_SNR
+    # sett['reg_params'] = {'bound': (0, 0.2), 'exclude_zero_freq': False}
 
     # Clustering settings
-    sett['n_cluster'] = 10
+    sett['n_cluster'] = 5
     sett['cls_init_std'] = 0.1
 
     sett['n_iter_alpha'] = 1
@@ -117,7 +117,7 @@ def get_boosted_kmeans_approx_bfgs_settings():
     sett['vm_type'] = VandermondeType.COS_MULT
 
     # Clustering settings
-    sett['n_cluster'] = 2
+    sett['n_cluster'] = 5
     sett['cls_init_std'] = 0.1
     sett['n_learner'] = 13
     sett['n_iter_cls'] = 3
@@ -163,7 +163,7 @@ if __name__ == '__main__':
     do_transpose = False
 
     # Alternation
-    n_alter = 20
+    n_alter = 50
 
     # ------- Load data -------
     rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item = \
@@ -229,7 +229,8 @@ if __name__ == '__main__':
     # ------- Do the alternation -------
     a_mat = alt.run(vm, rating_mat_tr, rating_mat_va, n_alter, min_value, max_value,
                     logger=logger,
-                    rating_mat_te=rating_mat_te)
+                    rating_mat_te=rating_mat_te,
+                    verbose=True)
 
     # ------- Print the best validated result -------
     best_iter = np.argmin(logger.rmse_va)

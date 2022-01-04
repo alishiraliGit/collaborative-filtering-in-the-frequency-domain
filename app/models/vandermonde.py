@@ -14,10 +14,10 @@ class VandermondeType:
 
 class RegularizationType:
     L2 = 'l2'
-    OPT = 'opt'
     POW = 'pow'
     MIN_NOISE_VAR = 'min_noise_var'
     MAX_SNR = 'max_snr'
+    POST_MAX_SNR = 'post_max_snr'
 
 
 class Vandermonde(abc.ABC):
@@ -58,7 +58,7 @@ class Vandermonde(abc.ABC):
     def calc_k_hat(v_obs_mat):
         return v_obs_mat.dot(v_obs_mat.T)/v_obs_mat.shape[1]
 
-    def update_c_mat(self, a=None):
+    def update_c_mat(self, a=None, is_test=False):
         # Flag c_mat
         self.c_mat_is_updated = True
 
@@ -68,14 +68,15 @@ class Vandermonde(abc.ABC):
         elif self.reg_type == RegularizationType.POW:
             z = self.reg_params['z']
             e1_mat = np.diag(e1(self.dim_a)) * (self.reg_params['exclude_zero_freq']*1)
-            c_mat = np.diag((z**np.array(range(self.dim_a)) - e1_mat)*self.reg_params['l2_lambda'])
+            c_mat = (np.diag(z**np.array(range(self.dim_a))) - e1_mat)*self.reg_params['l2_lambda']
         elif self.reg_type == RegularizationType.MIN_NOISE_VAR:
             c_mat = np.diag(MinNoiseReg(self.reg_params['bound'], self.reg_params['exclude_zero_freq']).find_c(
                 self.v_mat,
                 self.calc_k_hat(v_obs_mat=self.v_mat),
                 c_0_mat=self.c_mat
             ))
-        elif self.reg_type == RegularizationType.MAX_SNR:
+        elif self.reg_type == RegularizationType.MAX_SNR or\
+                (self.reg_type == RegularizationType.POST_MAX_SNR and is_test):
             c_mat = np.diag(MaxSNRReg(self.reg_params['bound'], self.reg_params['exclude_zero_freq']).find_c(
                 a,
                 self.v_mat,
@@ -83,6 +84,9 @@ class Vandermonde(abc.ABC):
                 c_0_mat=self.c_mat
             ))
             self.c_mat_is_updated = False
+        elif self.reg_type == RegularizationType.POST_MAX_SNR:
+            e1_mat = np.diag(e1(self.dim_a))*(self.reg_params['exclude_zero_freq']*1)
+            c_mat = (np.eye(self.dim_a) - e1_mat)*self.reg_params['bound'][1]
         else:
             raise Exception('unknown regularization type!')
 

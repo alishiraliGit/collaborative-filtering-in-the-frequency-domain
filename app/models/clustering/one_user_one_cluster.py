@@ -2,7 +2,7 @@ import numpy as np
 from tqdm import tqdm
 
 from app.models.clustering.clustering_base import Clustering
-from app.models.vandermonde import Vandermonde
+from app.models.vandermonde import Vandermonde, RegularizationType
 from app.models.debiasing.biascorrection import FirstOrderBiasCorrection
 
 
@@ -54,11 +54,21 @@ class OneUserOneClusterBiasCorrected(OneUserOneCluster):
 
         # Debiasing
         if is_test:
-            for cls in tqdm(range(self.n_cluster), disable=not verbose):
+            for cls in tqdm(range(self.n_cluster), disable=not verbose, desc='1u1cls:transform:debiasing'):
                 a = a_c_mat_new[:, cls]
                 r_cls_mat = rating_mat[cls:cls + 1]
 
+                # Update c_mat if required
+                if vm.reg_type == RegularizationType.POST_MAX_SNR:
+                    vm.update_c_mat(a, is_test=True)
+
+                    vm.c_mat_is_updated = True
+
+                    a = vm.calc_a_users([cls], rating_mat)[:, 0]
+
                 a_c_mat_new[:, cls] = self.debiaser.debias(vm, a, r_cls_mat)
+
+            vm.c_mat_is_updated = False
 
         return a_c_mat_new, self.users_clusters
 

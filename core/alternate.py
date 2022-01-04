@@ -1,6 +1,6 @@
 import numpy as np
 
-from app.models.vandermonde import Vandermonde
+from app.models.vandermonde import Vandermonde, RegularizationType
 from app.models.clustering.clustering_base import Clustering
 from app.models.updating.updater_base import Updater
 from app.models.logger import Logger
@@ -19,12 +19,13 @@ class Alternate:
         a_mat_opt = None
         for it in range(n_iter):
             # Do clustering
+            # ToDo
+            if rating_mat_te is not None and (it == n_iter - 1 or vm.reg_type != RegularizationType.POST_MAX_SNR):
+                a_c_mat_tt, users_clusters_tt = self.cls.fit_transform(vm, rating_mat_tr, is_test=True, verbose=verbose)
+                a_mat_tt = a_c_mat_tt[:, users_clusters_tt]
+
             a_c_mat, users_clusters = self.cls.fit_transform(vm, rating_mat_tr, verbose=verbose)
             a_mat = a_c_mat[:, users_clusters]
-
-            if rating_mat_te is not None:
-                a_c_mat_tt, users_clusters_tt = self.cls.fit_transform(vm, rating_mat_tr, is_test=True)
-                a_mat_tt = a_c_mat_tt[:, users_clusters_tt]
 
             # Do updating
             self.upd.fit_transform(vm, a_mat, rating_mat_tr)
@@ -32,7 +33,8 @@ class Alternate:
             # Calc rmse
             rmse_tr = self.calc_prediction_rmse(vm, a_mat, rating_mat_tr, min_val, max_val)
             rmse_va = self.calc_prediction_rmse(vm, a_mat, rating_mat_va, min_val, max_val)
-            if rating_mat_te is not None:
+            # ToDo
+            if rating_mat_te is not None and (it == n_iter - 1 or vm.reg_type != RegularizationType.POST_MAX_SNR):
                 rmse_te = self.calc_prediction_rmse(vm, a_mat_tt, rating_mat_te, min_val, max_val)
             else:
                 rmse_te = np.NaN
@@ -43,8 +45,8 @@ class Alternate:
                 if rmse_va > np.min(logger.rmse_va):
                     # ToDo
                     continue
-
-                if rating_mat_te is not None:
+                # ToDo
+                if rating_mat_te is not None and (it == n_iter - 1 or vm.reg_type != RegularizationType.POST_MAX_SNR):
                     a_mat_opt = a_mat_tt
                 else:
                     a_mat_opt = a_mat

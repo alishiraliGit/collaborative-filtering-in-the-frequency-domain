@@ -5,6 +5,10 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.optimize import LinearConstraint
 
+from app.utils.mat_ops import eij
+
+rng = np.random.default_rng(12)
+
 
 class OptimumRegularizationBase(abc.ABC):
     def __init__(self, bound, exclude_zero_freq):
@@ -46,6 +50,9 @@ class OptimumRegularizationBase(abc.ABC):
             c_0 = np.diag(c_0_mat)[b:]
 
         constraint = LinearConstraint(np.ones((dim_a,)), lb=-np.inf, ub=self.bound[1]*dim_a)
+        g_consts = []
+        # for m in range(dim_a - 1):
+        #    g_consts.append(LinearConstraint(eij(m + 1, m, dim_a), lb=0, ub=np.inf))
 
         try:
             # noinspection PyTypeChecker
@@ -55,7 +62,7 @@ class OptimumRegularizationBase(abc.ABC):
                 x0=c_0,
                 args=tuple(args),
                 bounds=[(self.bound[0], None)]*dim_a,
-                constraints=constraint,
+                constraints=[constraint] + g_consts,
                 method='trust-constr',
                 options={'disp': 0}
             )
@@ -75,22 +82,6 @@ class MinNoiseVarianceRegularization(OptimumRegularizationBase):
         super().__init__(bound, exclude_zero_freq)
 
     @staticmethod
-    def fun_old(c, v_mat, k_mat):
-        n_item = v_mat.shape[1]
-
-        c_mat = np.diag(c)
-        y_mat = np.linalg.inv(k_mat + c_mat)
-
-        val = 0
-        for it_1 in range(n_item):
-            v_1 = v_mat[:, it_1:it_1 + 1]
-            left_mult_mat = y_mat.dot(v_1)
-
-            val += np.sum(left_mult_mat.T.dot(v_mat)**2)
-
-        return val
-
-    @staticmethod
     def fun(c, v_mat, k_mat):
         c_mat = np.diag(c)
         y_mat = np.linalg.inv(k_mat + c_mat)
@@ -100,7 +91,7 @@ class MinNoiseVarianceRegularization(OptimumRegularizationBase):
         return val
 
     @staticmethod
-    def grad(c, v_mat, k_mat):
+    def grad_old(c, v_mat, k_mat):
         dim_a, n_item = v_mat.shape
 
         c_mat = np.diag(c)
@@ -117,6 +108,22 @@ class MinNoiseVarianceRegularization(OptimumRegularizationBase):
 
         return g
 
+    @staticmethod
+    def grad(c, v_mat, k_mat):
+        dim_a, n_item = v_mat.shape
+
+        c_mat = np.diag(c)
+        y_mat = np.linalg.inv(k_mat + c_mat)
+
+        y_v_mat = y_mat.dot(v_mat)
+
+        g = np.zeros((dim_a,))
+        for it in range(n_item):
+            v_i = v_mat[:, it:it + 1]
+            g += np.sum(-2*v_i.T.dot(y_v_mat) * y_v_mat[:, it:it + 1] * y_v_mat, axis=1)
+
+        return g
+
 
 class MaxSNRRegularization(OptimumRegularizationBase):
     def __init__(self, bound, exclude_zero_freq):
@@ -128,18 +135,27 @@ class MaxSNRRegularization(OptimumRegularizationBase):
         return np.sum(s**2)
 
     @staticmethod
-    def grad_signal_power(a, k_mat, y_mat, v_mat):
+    def grad_signal_power_old(a, k_mat, y_mat, v_mat):
         dim_a, n_item = v_mat.shape
 
         left_multiplier = k_mat.dot(a.reshape((-1, 1)))
+        left_y = left_multiplier.T.dot(y_mat)
 
         g = np.zeros((dim_a,))
         for it in range(n_item):
             v_i = v_mat[:, it:it + 1]
-            g += 2*left_multiplier.T.dot(y_mat).dot(v_i)[0, 0] * \
-                OptimumRegularizationBase.grad_a_y_b(left_multiplier, y_mat, v_i)
+            g += -2*left_y.dot(v_i)[0, 0] * \
+                left_y[0] * y_mat.dot(v_i)[:, 0]
 
         return g
+
+    @staticmethod
+    def grad_signal_power(a, k_mat, y_mat, v_mat):
+        left_mult = k_mat.dot(a.reshape((-1, 1)))
+
+        g_mat = -2*left_mult.T.dot(y_mat).dot(v_mat) * y_mat.dot(left_mult) * y_mat.dot(v_mat)
+
+        return np.sum(g_mat, axis=1)
 
     @staticmethod
     def fun(c, a, v_mat, k_mat):
@@ -166,7 +182,7 @@ if __name__ == '__main__':
     _dim_a = 4
     _n_item = 10
     _m = 0
-    _eps = 1e-5
+    _eps = 1e-6
 
     # Init.
     _a = np.random.randn(_dim_a, 1)
@@ -185,10 +201,10 @@ if __name__ == '__main__':
     _y_mat_p = np.linalg.inv(_k_hat + _c_mat_p)
 
     # Select the regularization
-    _Reg = MinNoiseVarianceRegularization
+    _Reg = MaxSNRRegularization
 
-    # _args = (_a[:, 0], _v_mat, _k_hat)
-    _args = (_v_mat, _k_hat)
+    _args = (_a[:, 0], _v_mat, _k_hat)
+    # _args = (_v_mat, _k_hat)
 
     # Calc. numerical deriv
     _deriv_num = (_Reg.fun(np.diag(_c_mat_p), *_args) - _Reg.fun(np.diag(_c_mat), *_args))/_eps

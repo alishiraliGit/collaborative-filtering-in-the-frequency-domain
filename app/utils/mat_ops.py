@@ -26,6 +26,13 @@ def e1(dim):
     return vec
 
 
+def eij(i, j, dim):
+    vec = np.zeros((dim,))
+    vec[i] = 1
+    vec[j] = -1
+    return vec
+
+
 def get_ari(mat):
     a = np.sum(mat, axis=1)
     b = np.sum(mat, axis=0)
