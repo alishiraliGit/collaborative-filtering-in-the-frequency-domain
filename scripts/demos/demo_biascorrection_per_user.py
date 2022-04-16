@@ -73,7 +73,7 @@ if __name__ == '__main__':
     _multi_upd = MultiUpdaterWrapper(upds=[_approx_upd, _bfgs_upd])
 
     # Init. alternate
-    _alt = Alternate(cls=_cls, upd=_multi_upd)
+    _alt = Alternate(clust=_cls, upd=_multi_upd)
 
     # Init. logger
     _logger = Logger(settings=Logger.dicts_to_dic([_simul_sett, _cls_bc_sett, _approx_upd_sett, _bfgs_sett]),

@@ -1,14 +1,14 @@
 import numpy as np
+from tqdm import tqdm
 
 from app.models.vandermonde import Vandermonde
 from app.models.clustering.kmeans import Clustering
 
 
 class Boosting(Clustering):
-    def __init__(self, cls: Clustering, n_learner, n_iter_cls):
-        self.cls = cls
+    def __init__(self, clust: Clustering, n_learner):
+        self.clust = clust
         self.n_learner = n_learner
-        self.n_iter_cls = n_iter_cls
 
         self.a_mat = None
 
@@ -19,13 +19,11 @@ class Boosting(Clustering):
         rating_mat_res = rating_mat.copy()
         self.a_mat = np.zeros((vm.dim_a, n_user))
 
-        for learner in range(self.n_learner):
+        for _learner in tqdm(range(self.n_learner), desc='fit (boosting)'):
             # Do clustering multiple of times with "rating_mat_res"
-            cls_learner = self.cls.copy(do_init=True)
+            clust_learner = self.clust.copy(do_init=True)
 
-            for _ in range(self.n_iter_cls - 1):
-                cls_learner.fit_transform(vm, rating_mat_res)
-            a_c_mat, users_clusters = cls_learner.fit_transform(vm, rating_mat_res)
+            a_c_mat, users_clusters = clust_learner.fit_transform(vm, rating_mat_res)
 
             a_mat_learner = a_c_mat[:, users_clusters]
 
@@ -44,4 +42,4 @@ class Boosting(Clustering):
         return self.a_mat, pseudo_users_clusters
 
     def copy(self, do_init):
-        return Boosting(self.cls.copy(do_init), self.n_learner, self.n_iter_cls)
+        return Boosting(self.clust.copy(do_init), self.n_learner)

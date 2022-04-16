@@ -6,7 +6,7 @@ from datetime import datetime
 from scipy.io import loadmat, savemat
 
 from app.models.vandermonde import Vandermonde, VandermondeType
-from app.models.clustering.kmeans import KMeans
+from app.models.clustering.kmeans import KMeansOneIter
 from app.models.clustering.boosting import Boosting
 from app.utils.mat_ops import get_ari
 from app.utils.plotting import plot_with_conf_interval
@@ -157,9 +157,9 @@ def run_kmeans(sim_sett, x_mat, rating_mat, l2_lambda=0):
     vm_kmean.transform(x_0)
 
     # K-mean
-    cls_kmean = KMeans(n_cluster=sett_kmean['n_cluster'],
-                       a_c_mat_0=a_c_mat_kmeans_0,
-                       l2_lambda=sett_kmean['l2_lambda_cls'])
+    cls_kmean = KMeansOneIter(n_cluster=sett_kmean['n_cluster'],
+                              a_c_mat_0=a_c_mat_kmeans_0,
+                              l2_lambda=sett_kmean['l2_lambda_cls'])
 
     a_c_mat_kmean, users_clusters_kmean = cls_kmean.fit_transform(vm_kmean, rating_mat)
     for _ in range(sett_kmean['n_iter_cls'] - 1):
@@ -187,9 +187,9 @@ def run_boosted_kmeans(sim_sett, x_mat, rating_mat):
     vm_boost.transform(x_0)
 
     # K-mean
-    cls_kmean = KMeans(n_cluster=sett_boost['n_cluster'],
-                       a_c_mat_0=a_c_mat_boost_0,
-                       l2_lambda=sett_boost['l2_lambda_cls'])
+    cls_kmean = KMeansOneIter(n_cluster=sett_boost['n_cluster'],
+                              a_c_mat_0=a_c_mat_boost_0,
+                              l2_lambda=sett_boost['l2_lambda_cls'])
 
     # Boosting
     cls_boost = Boosting(cls_kmean, sett_boost['n_learner'], sett_boost['n_iter_cls'])

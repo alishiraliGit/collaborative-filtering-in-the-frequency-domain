@@ -35,8 +35,6 @@ class Vandermonde(abc.ABC):
         self.reg_params = reg_params  # dict
         self.c_mat = None
         self.c_mat_is_updated = False
-        # ToDo
-        self.tmp = []
 
     @staticmethod
     def get_instance(dim_x, m, vm_type: VandermondeType, reg_type: RegularizationType, reg_params=None):
@@ -67,8 +65,8 @@ class Vandermonde(abc.ABC):
             c_mat = (np.eye(self.dim_a) - e1_mat)*self.reg_params['l2_lambda']
         elif self.reg_type == RegularizationType.POW:
             z = self.reg_params['z']
-            e1_mat = np.diag(e1(self.dim_a)) * (self.reg_params['exclude_zero_freq']*1)
-            c_mat = (np.diag(z**np.array(range(self.dim_a))) - e1_mat)*self.reg_params['l2_lambda']
+            e1_mat = np.diag(e1(self.dim_a))*(self.reg_params['exclude_zero_freq']*1)
+            c_mat = (np.diag(z**np.sum(self.v_mult, axis=1)) - e1_mat)*self.reg_params['l2_lambda']
         elif self.reg_type == RegularizationType.MIN_NOISE_VAR:
             c_mat = np.diag(MinNoiseReg(self.reg_params['bound'], self.reg_params['exclude_zero_freq']).find_c(
                 self.v_mat,
@@ -114,8 +112,6 @@ class Vandermonde(abc.ABC):
                 }
                 a_0 = vm_0.calc_a_users(users, rating_mat)
                 self.update_c_mat(a_0[:, 0])
-                # ToDo
-                self.tmp.append(np.diag(self.c_mat).reshape((1, -1)))
             else:
                 self.update_c_mat()
 

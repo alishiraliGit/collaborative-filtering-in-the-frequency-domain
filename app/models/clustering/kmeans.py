@@ -7,7 +7,7 @@ from app.models.debiasing.biascorrection import FirstOrderBiasCorrection
 from app.utils.mat_ops import vectorize_rows
 
 
-class KMeans(Clustering):
+class KMeansOneIter(Clustering):
     def __init__(self, n_cluster, a_c_mat_0):
         Clustering.__init__(self)
 
@@ -52,11 +52,44 @@ class KMeans(Clustering):
         else:
             a_c_mat = self.a_c_mat.copy()
 
-        cls = KMeans(self.n_cluster, a_c_mat)
+        cls = KMeansOneIter(self.n_cluster, a_c_mat)
+
         return cls
 
 
-class KMeansBiasCorrected(KMeans):
+class KMeans(Clustering):
+    def __init__(self, n_cluster, n_iter, a_c_mat_0):
+        Clustering.__init__(self)
+
+        self.n_cluster = n_cluster
+        self.n_iter = n_iter
+
+        self.a_c_mat = a_c_mat_0  # [dim_a, n_cluster]
+        self.users_clusters = None
+
+    def fit(self, vm: Vandermonde, rating_mat):
+        kmeans_one_iter = KMeansOneIter(n_cluster=self.n_cluster, a_c_mat_0=self.a_c_mat)
+
+        for it in range(self.n_iter):
+            self.a_c_mat, self.users_clusters = kmeans_one_iter.fit_transform(vm, rating_mat)
+
+        return
+
+    def transform(self, vm: Vandermonde, rating_mat, **_kwargs):
+        return self.a_c_mat, self.users_clusters
+
+    def copy(self, do_init):
+        if do_init:
+            a_c_mat = np.random.normal(loc=0, scale=np.std(self.a_c_mat), size=self.a_c_mat.shape)
+        else:
+            a_c_mat = self.a_c_mat.copy()
+
+        cls = KMeans(self.n_cluster, self.n_iter, a_c_mat)
+
+        return cls
+
+
+class KMeansBiasCorrected(KMeansOneIter):
     def __init__(self, n_cluster, a_c_mat_0,
                  n_iter=1, estimate_sigma_n=False, sigma_n=None, min_alpha=-1., max_alpha=1.):
         super().__init__(n_cluster, a_c_mat_0)

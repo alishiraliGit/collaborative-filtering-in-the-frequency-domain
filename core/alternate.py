@@ -7,8 +7,8 @@ from app.models.logger import Logger
 
 
 class Alternate:
-    def __init__(self, cls: Clustering, upd: Updater):
-        self.cls = cls
+    def __init__(self, clust: Clustering, upd: Updater):
+        self.clust = clust
         self.upd = upd
 
     def run(self, vm: Vandermonde, rating_mat_tr, rating_mat_va, n_iter, min_val, max_val,
@@ -20,12 +20,14 @@ class Alternate:
         for it in range(n_iter):
             # Do clustering
             # ToDo
-            if rating_mat_te is not None and (it == n_iter - 1 or vm.reg_type != RegularizationType.POST_MAX_SNR):
-                a_c_mat_tt, users_clusters_tt = self.cls.fit_transform(vm, rating_mat_tr, is_test=True, verbose=verbose)
+            if False and rating_mat_te is not None and (it == n_iter - 1 or vm.reg_type != RegularizationType.POST_MAX_SNR):
+                a_c_mat_tt, users_clusters_tt = self.clust.fit_transform(vm, rating_mat_tr, is_test=True, verbose=verbose)
                 a_mat_tt = a_c_mat_tt[:, users_clusters_tt]
 
-            a_c_mat, users_clusters = self.cls.fit_transform(vm, rating_mat_tr, verbose=verbose)
+            a_c_mat, users_clusters = self.clust.fit_transform(vm, rating_mat_tr, verbose=verbose)
             a_mat = a_c_mat[:, users_clusters]
+            # ToDo
+            a_mat_tt = a_mat
 
             # Do updating
             self.upd.fit_transform(vm, a_mat, rating_mat_tr)

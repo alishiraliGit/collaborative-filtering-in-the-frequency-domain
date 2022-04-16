@@ -117,7 +117,7 @@ if __name__ == '__main__':
     multi_upd = MultiUpdaterWrapper(upds=[approx_upd, bfgs_upd])
 
     # Init. alternate
-    alt = Alternate(cls=one_user_one_cluster, upd=multi_upd)
+    alt = Alternate(clust=one_user_one_cluster, upd=multi_upd)
 
     # Init. logger
     logger = Logger(settings=settings, save_path=save_path, do_plot=do_plot)

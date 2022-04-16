@@ -1,17 +1,18 @@
 import numpy as np
-from numpy.random import default_rng
 import os
 from sklearn.linear_model import LinearRegression
 
 from app.utils.data_handler import load_dataset
-from app.models.vandermonde import Vandermonde, VandermondeType
+from app.models.vandermonde import Vandermonde, VandermondeType, RegularizationType
 from core.alternate import Alternate
-from app.models.clustering.kmeans import KMeans
+from app.models.clustering.kmeans import KMeans, KMeansBiasCorrected
 from app.models.clustering.boosting import Boosting
 from app.models.updating.approximate_updater import ApproximateUpdater
 from app.models.updating.bfgs import BFGS
 from app.models.updating.multi_updater_wrapper import MultiUpdaterWrapper
 from app.models.logger import Logger
+
+rng = np.random.default_rng(1)
 
 
 def calc_rmse(y_predict, y_g_truth, min_val, max_val):
@@ -47,8 +48,33 @@ def fit_reg(v_m_u, a_m_u, mean_u, v_m_i, a_m_i, mean_i, rat_mat):
     return reg_mdl, x_pr, y
 
 
-def estimate_l2_lambda(ratio, std_err, n_eq, std_est, n_est):
-    return ratio * (std_err*n_eq) / (n_est*std_est)
+def clust_selector(sett, a_clust_mat_0):
+    if sett['clust_method'] == 'k-means':
+        return KMeans(
+            n_cluster=sett['n_cluster'],
+            n_iter=sett['n_iter_clust'],
+            a_c_mat_0=a_clust_mat_0
+        )
+    elif sett['clust_method'] == 'k-means-bc':
+        # ToDo
+        return KMeansBiasCorrected(
+            n_cluster=sett['n_cluster'],
+            a_c_mat_0=a_clust_mat_0,
+            n_iter=sett['n_iter_alpha'],
+            estimate_sigma_n=sett['estimate_sigma_n'],
+            sigma_n=sett['sigma_n'],
+            min_alpha=sett['min_alpha']
+        )
+    elif sett['clust_method'] == 'boosting':
+        kmeans = KMeans(
+            n_cluster=sett['n_cluster'],
+            n_iter=sett['n_iter_clust'],
+            a_c_mat_0=a_clust_mat_0
+        )
+        return Boosting(
+           clust=kmeans,
+           n_learner=sett['n_learner']
+        )
 
 
 def get_kmeans_approx_settings():
@@ -103,34 +129,6 @@ def get_boosted_kmeans_approx_settings():
     return sett
 
 
-def get_boosted_kmeans_approx_ls_settings():
-    sett = {}
-
-    method = 'boosted_kmeans_approx_ls'
-
-    sett['method'] = method
-
-    # Vandermonde settings
-    sett['dim_x'] = 3
-    sett['m'] = 4
-
-    # Clustering settings
-    sett['n_cluster'] = 2
-    sett['cls_init_std'] = 0.1
-    sett['n_learner'] = 4
-    sett['n_iter_cls'] = 3
-
-    # Updater settings
-    sett['gamma'] = 1
-    sett['max_nfev'] = 3
-
-    # Estimate regularization coefficients
-    sett['l2_lambda'] = 0
-    sett['l2_lambda_cls'] = 0
-
-    return sett
-
-
 def get_kmeans_approx_bfgs_settings():
     sett = {}
 
@@ -161,28 +159,30 @@ def get_kmeans_approx_bfgs_settings():
 def get_boosted_kmeans_approx_bfgs_settings():
     sett = {}
 
-    method = 'kmeans_boosted_approx_bfgs'
+    method = 'boosted_kmeans_approx_bfgs'
 
     sett['method'] = method
 
-    # Vandermonde settings
+    # --- Vandermonde settings ---
     sett['dim_x'] = 3
     sett['m'] = 4
     sett['vm_type'] = VandermondeType.COS_MULT
+    # Reg.
+    sett['reg_type'] = RegularizationType.L2
+    sett['reg_params'] = {'l2_lambda': 10, 'exclude_zero_freq': True}
 
-    # Clustering settings
+    # --- Clustering settings ---
+    sett['clust_method'] = 'boosting'
+    sett['n_learner'] = 10
     sett['n_cluster'] = 2
-    sett['cls_init_std'] = 0.1
-    sett['n_learner'] = 6
-    sett['n_iter_cls'] = 3
+    sett['n_iter_clust'] = 5
+    sett['std_init_clust'] = 1e-2
 
-    # Updater settings
+    # --- Updater(s) settings ---
+    # Approx.
     sett['gamma'] = 1
+    # BFGS
     sett['max_iter_bfgs'] = 5
-
-    # Regularization coefficients
-    sett['l2_lambda'] = 0
-    sett['l2_lambda_cls'] = 0
 
     return sett
 
@@ -201,32 +201,31 @@ if __name__ == '__main__':
     do_plot = False
 
     # Path
-    load_path = os.path.join('..', 'data', 'ml-1m')
+    load_path = os.path.join('..', 'data', 'ml-100k')
 
     save_path = os.path.join('..', 'results')
     os.makedirs(save_path, exist_ok=True)
 
     # Dataset
-    dataset_name = 'ml-1m'
-    min_value = 1
-    max_value = 5
+    dataset_name = 'ml-100k'
+    dataset_part = 3
 
     # Cross-validation
-    test_split = 0.05
-    val_split = 0.05/(1 - test_split)
+    test_split = np.nan
+    val_split = 0.1/(1 - 0.2)
 
     # Alternation settings
     n_iter = 5
 
     # ------- Load data -------
-    rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item = \
-        load_dataset(load_path, dataset_name, te_split=test_split, va_split=val_split, do_transpose=False)
+    rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item, min_value, max_value = \
+        load_dataset(load_path, dataset_name, part=dataset_part,
+                     va_split=val_split, te_split=test_split,
+                     do_transpose=False)
 
     print('Data loaded ...')
 
     # ------- Initialization for the big loop -------
-    rng = default_rng(1)
-
     # Init. logger
     logger_u = Logger(settings=settings_u, save_path=save_path, do_plot=do_plot)
     logger_i = Logger(settings=settings_i, save_path=save_path, do_plot=do_plot)
@@ -259,44 +258,38 @@ if __name__ == '__main__':
     for it in range(n_iter):
         # ToDo
         if it == 0:
-            n_alter = 8
+            n_alter = 3
         else:
             n_alter = 3
+
         # ------- Initialization -------
         #  Init. Vandermonde
-        vm_u = Vandermonde.get_instance(dim_x=settings_u['dim_x'],
-                                        m=settings_u['m'],
-                                        l2_lambda=settings_u['l2_lambda'],
-                                        vm_type=settings_u['vm_type'])
+        vm_u = Vandermonde.get_instance(
+            dim_x=settings_u['dim_x'],
+            m=settings_u['m'],
+            vm_type=settings_u['vm_type'],
+            reg_type=settings_u['reg_type'],
+            reg_params=settings_u['reg_params']
+        )
 
-        vm_i = Vandermonde.get_instance(dim_x=settings_i['dim_x'],
-                                        m=settings_i['m'],
-                                        l2_lambda=settings_i['l2_lambda'],
-                                        vm_type=settings_i['vm_type'])
+        vm_i = Vandermonde.get_instance(
+            dim_x=settings_i['dim_x'],
+            m=settings_i['m'],
+            vm_type=settings_i['vm_type'],
+            reg_type=settings_i['reg_type'],
+            reg_params=settings_i['reg_params']
+        )
 
         #  Init. "x" and "a_c"
         x_mat_0_u = rng.random((settings_u['dim_x'], n_item))
         x_mat_0_i = rng.random((settings_i['dim_x'], n_user))
 
-        a_c_mat_0_u = rng.normal(loc=0, scale=settings_u['cls_init_std'], size=(vm_u.dim_a, settings_u['n_cluster']))
-        a_c_mat_0_i = rng.normal(loc=0, scale=settings_i['cls_init_std'], size=(vm_i.dim_a, settings_i['n_cluster']))
+        a_c_mat_0_u = rng.normal(loc=0, scale=settings_u['std_init_clust'], size=(vm_u.dim_a, settings_u['n_cluster']))
+        a_c_mat_0_i = rng.normal(loc=0, scale=settings_i['std_init_clust'], size=(vm_i.dim_a, settings_i['n_cluster']))
 
         #  Init. clustering
-        kmeans_u = KMeans(n_cluster=settings_u['n_cluster'],
-                          a_c_mat_0=a_c_mat_0_u,
-                          l2_lambda=settings_u['l2_lambda_cls'])
-
-        kmeans_i = KMeans(n_cluster=settings_i['n_cluster'],
-                          a_c_mat_0=a_c_mat_0_i,
-                          l2_lambda=settings_i['l2_lambda_cls'])
-
-        boost_u = Boosting(cls=kmeans_u,
-                           n_learner=settings_u['n_learner'],
-                           n_iter_cls=settings_u['n_iter_cls'])
-
-        boost_i = Boosting(cls=kmeans_i,
-                           n_learner=settings_i['n_learner'],
-                           n_iter_cls=settings_i['n_iter_cls'])
+        clust_u = clust_selector(settings_u, a_c_mat_0_u)
+        clust_i = clust_selector(settings_i, a_c_mat_0_i)
 
         # Init. updaters
         approx_upd_u = ApproximateUpdater(x_mat_0=x_mat_0_u,
@@ -315,8 +308,8 @@ if __name__ == '__main__':
         multi_upd_i = MultiUpdaterWrapper(upds=[approx_upd_i, bfgs_upd_i])
 
         # Init. alternates
-        alt_u = Alternate(cls=boost_u, upd=multi_upd_u)
-        alt_i = Alternate(cls=boost_i, upd=multi_upd_i)
+        alt_u = Alternate(clust=clust_u, upd=multi_upd_u)
+        alt_i = Alternate(clust=clust_i, upd=multi_upd_i)
 
         # ------- Fit Vandermonde -------
         vm_u.fit()

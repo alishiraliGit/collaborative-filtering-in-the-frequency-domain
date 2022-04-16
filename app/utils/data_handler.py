@@ -6,7 +6,7 @@ import os
 import pandas as pd
 
 
-def load_dataset(loadpath, name, va_split=None, te_split=None, random_state=1, do_transpose=False, **kwargs):
+def load_dataset(loadpath, name, va_split=None, te_split=None, do_transpose=False, random_state=1, **kwargs):
 
     rng = default_rng(random_state)
 
@@ -24,6 +24,10 @@ def load_dataset(loadpath, name, va_split=None, te_split=None, random_state=1, d
         rat_mat_va = get_rating_mat(edges_va, num_user, num_item)
         rat_mat_te = get_rating_mat(edges_te, num_user, num_item)
 
+        # From dataset spec
+        min_val = 1
+        max_val = 5
+
     elif name == 'ml-1m':
         edges_notmapped = get_edge_list_from_file_ml1m(loadpath, 'ratings.dat')
         edges, map_u, map_i, num_user, num_item = map_ids(edges_notmapped)
@@ -34,6 +38,10 @@ def load_dataset(loadpath, name, va_split=None, te_split=None, random_state=1, d
         rat_mat_tr = get_rating_mat(edges_tr, num_user, num_item)
         rat_mat_va = get_rating_mat(edges_va, num_user, num_item)
         rat_mat_te = get_rating_mat(edges_te, num_user, num_item)
+
+        # From dataset spec
+        min_val = 1
+        max_val = 5
 
     elif name == 'jester':
         df_1 = pd.read_excel(os.path.join(loadpath, 'jester-data-1.xls'))
@@ -77,6 +85,10 @@ def load_dataset(loadpath, name, va_split=None, te_split=None, random_state=1, d
 
         num_user, num_item = rat_mat.shape
 
+        # From dataset spec
+        min_val = -10
+        max_val = 10
+
     elif name == 'monday_offers':
         df = pd.read_csv(os.path.join(loadpath, 'users_n_offering(binary).csv'))
 
@@ -108,6 +120,10 @@ def load_dataset(loadpath, name, va_split=None, te_split=None, random_state=1, d
 
         num_user, num_item = rat_mat.shape
 
+        # From dataset spec
+        min_val = 0
+        max_val = 1
+
     elif name == 'coat':
         file_path_tr = os.path.join(loadpath, 'train.ascii')
         file_path_te = os.path.join(loadpath, 'test.ascii')
@@ -130,8 +146,12 @@ def load_dataset(loadpath, name, va_split=None, te_split=None, random_state=1, d
         rat_mat_va = rat_mat_tr_va.copy()
         rat_mat_va[mask_tr] = np.nan
 
+        # From dataset spec
+        min_val = 1
+        max_val = 5
+
     else:
-        raise Exception('%s is not valid dataset.' % name)
+        raise Exception('%s is not a valid dataset.' % name)
 
     if do_transpose:
         rat_mat_tr = rat_mat_tr.T
@@ -139,7 +159,7 @@ def load_dataset(loadpath, name, va_split=None, te_split=None, random_state=1, d
         rat_mat_te = rat_mat_te.T
         num_user, num_item = num_item, num_user
 
-    return rat_mat_tr, rat_mat_va, rat_mat_te, num_user, num_item
+    return rat_mat_tr, rat_mat_va, rat_mat_te, num_user, num_item, min_val, max_val
 
 
 def get_edge_list_from_file_ml100k(file_path, file_name):
@@ -202,5 +222,5 @@ def get_rating_mat(edges, n_user, n_item):
 if __name__ == '__main__':
     load_path = os.path.join('..', '..', 'data', 'coat')
 
-    rating_mat_tr, rating_mat_va, rating_mat_te, n_u, n_i = \
+    rating_mat_tr, rating_mat_va, rating_mat_te, n_u, n_i, min_value, max_value = \
         load_dataset(load_path, 'coat', va_split=0.1, random_state=1)

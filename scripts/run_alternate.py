@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 from numpy.random import default_rng
 import os
@@ -15,64 +17,37 @@ from app.models.logger import Logger
 rng = default_rng(1)
 
 
-def get_boosted_kmeans_approx_settings():
+def get_kmeans_approx_bfgs_settings():
     sett = {}
 
-    method = 'boosted_kmeans_approx'
+    method = 'kmeans_approx_bfgs'
 
     sett['method'] = method
 
-    # Boosting settings
-    sett['n_learner'] = 10
-    sett['n_iter_cls'] = 3
-
-    # Vandermonde settings
+    # --- Vandermonde settings ---
     sett['dim_x'] = 3
     sett['m'] = 4
+    sett['vm_type'] = VandermondeType.COS_MULT
+    # Reg.
+    sett['reg_type'] = RegularizationType.L2
+    sett['reg_params'] = {'l2_lambda': 1, 'exclude_zero_freq': True}
 
-    # Clustering settings
-    sett['n_cluster'] = 2
-    sett['cls_init_std'] = 0.1
+    # --- Clustering settings ---
+    sett['clust_method'] = 'k-means'
+    sett['n_cluster'] = 7
+    sett['n_iter_clust'] = 5
+    sett['std_init_clust'] = 1e-2
 
-    # Updater settings
-    sett['gamma'] = 0.2
-
-    # Estimate regularization coefficients
-    sett['l2_lambda'] = 0
-    sett['l2_lambda_cls'] = 0
-
-    return sett
-
-
-def get_boosted_kmeans_approx_ls_settings():
-    sett = {}
-
-    method = 'boosted_kmeans_approx_ls'
-
-    sett['method'] = method
-
-    # Vandermonde settings
-    sett['dim_x'] = 3
-    sett['m'] = 5
-
-    # Clustering settings
-    sett['n_cluster'] = 2
-    sett['cls_init_std'] = 0.1
-    sett['n_learner'] = 4
-    sett['n_iter_cls'] = 3
-
-    # Updater settings
-    sett['gamma'] = 0.1
-    sett['max_nfev'] = 4
-
-    # Estimate regularization coefficients
-    sett['l2_lambda'] = 0
-    sett['l2_lambda_cls'] = 0
+    # --- Updater(s) settings ---
+    # Approx.
+    sett['gamma'] = 1
+    # BFGS
+    sett['max_iter_bfgs'] = 5
 
     return sett
 
 
-def get_kmeans_approx_bfgs_settings():
+def get_kmeans_approx_bfgs_bc_settings():
     sett = {}
 
     method = 'kmeans_approx_bfgs'
@@ -81,7 +56,7 @@ def get_kmeans_approx_bfgs_settings():
 
     # Vandermonde settings
     sett['dim_x'] = 2
-    sett['m'] = 5
+    sett['m'] = 3
     sett['vm_type'] = VandermondeType.COS_MULT
     sett['reg_type'] = RegularizationType.L2
     sett['reg_params'] = {'l2_lambda': 0.2, 'exclude_zero_freq': False}
@@ -89,6 +64,7 @@ def get_kmeans_approx_bfgs_settings():
     # sett['reg_params'] = {'bound': (0, 0.2), 'exclude_zero_freq': False}
 
     # Clustering settings
+    sett['cls'] = 'k-means'
     sett['n_cluster'] = 5
     sett['cls_init_std'] = 0.1
 
@@ -111,67 +87,98 @@ def get_boosted_kmeans_approx_bfgs_settings():
 
     sett['method'] = method
 
-    # Vandermonde settings
-    sett['dim_x'] = 2
-    sett['m'] = 2
+    # --- Vandermonde settings ---
+    sett['dim_x'] = 3
+    sett['m'] = 4
     sett['vm_type'] = VandermondeType.COS_MULT
+    # Reg.
+    sett['reg_type'] = RegularizationType.L2
+    sett['reg_params'] = {'l2_lambda': 10, 'exclude_zero_freq': True}
 
-    # Clustering settings
-    sett['n_cluster'] = 5
-    sett['cls_init_std'] = 0.1
-    sett['n_learner'] = 13
-    sett['n_iter_cls'] = 3
+    # --- Clustering settings ---
+    sett['clust_method'] = 'boosting'
+    sett['n_learner'] = 15
+    sett['n_cluster'] = 2
+    sett['n_iter_clust'] = 5
+    sett['std_init_clust'] = 1e-2
 
-    # Updater settings
+    # --- Updater(s) settings ---
+    # Approx.
     sett['gamma'] = 1
+    # BFGS
     sett['max_iter_bfgs'] = 5
-
-    # Regularization coefficients
-    sett['l2_lambda'] = 10
-    sett['l2_lambda_cls'] = 0
 
     return sett
 
 
-if __name__ == '__main__':
-    # ------- Settings -------
-    # Method
-    settings = get_kmeans_approx_bfgs_settings()
+def clust_selector(sett, a_clust_mat_0):
+    if sett['clust_method'] == 'k-means':
+        return KMeans(
+            n_cluster=sett['n_cluster'],
+            n_iter=sett['n_iter_clust'],
+            a_c_mat_0=a_clust_mat_0
+        )
+    elif sett['clust_method'] == 'k-means-bc':
+        # ToDo
+        return KMeansBiasCorrected(
+            n_cluster=sett['n_cluster'],
+            a_c_mat_0=a_clust_mat_0,
+            n_iter=sett['n_iter_alpha'],
+            estimate_sigma_n=sett['estimate_sigma_n'],
+            sigma_n=sett['sigma_n'],
+            min_alpha=sett['min_alpha']
+        )
+    elif sett['clust_method'] == 'boosting':
+        kmeans = KMeans(
+            n_cluster=sett['n_cluster'],
+            n_iter=sett['n_iter_clust'],
+            a_c_mat_0=a_clust_mat_0
+        )
+        return Boosting(
+           clust=kmeans,
+           n_learner=sett['n_learner']
+        )
 
+
+if __name__ == '__main__':
+    # ----- Settings -----
+    # Method
+    settings = get_boosted_kmeans_approx_bfgs_settings()
     print(settings)
 
     # General
     do_plot = True
-    do_save = False
+    do_save = True
+
+    # Item-based (True) or user-based
+    do_transpose = True
+
+    # Alternation
+    n_alter = 10
+
+    # Dataset
+    dataset_name = 'ml-100k'
+    dataset_part = 5
+
+    # Cross-validation
+    test_split = np.nan
+    val_split = 0.02/(1 - 0.2)
 
     # Path
-    load_path = os.path.join('..', 'data', 'coat')
+    load_path = os.path.join('..', 'data', 'ml-100k')
 
     save_path = os.path.join('..', 'results')
     os.makedirs(save_path, exist_ok=True)
 
-    # Dataset
-    dataset_name = 'coat'
-    min_value = 1
-    max_value = 5
-
-    # Cross-validation
-    # test_split = 0.1
-    val_split = 0.1
-
-    # Item-based (True) or user-based
-    do_transpose = False
-
-    # Alternation
-    n_alter = 50
-
-    # ------- Load data -------
-    rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item = \
-        load_dataset(load_path, dataset_name, va_split=val_split, do_transpose=do_transpose)
+    # ----- Load data -----
+    rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item, min_value, max_value = \
+        load_dataset(load_path, dataset_name, part=dataset_part,
+                     va_split=val_split, te_split=test_split,
+                     do_transpose=do_transpose)
 
     print('Data loaded ...')
 
-    # ------- Initialization -------
+    # ----- Initialization -----
     #  Init. Vandermonde
     vm = Vandermonde.get_instance(
         dim_x=settings['dim_x'],
@@ -183,27 +190,10 @@ if __name__ == '__main__':
 
     #  Init. "x" and "a_c"
     x_mat_0 = rng.random((settings['dim_x'], n_item))
-    a_c_mat_0 = rng.normal(loc=0, scale=settings['cls_init_std'], size=(vm.dim_a, settings['n_cluster']))
+    a_c_mat_0 = rng.normal(loc=0, scale=settings['std_init_clust'], size=(vm.dim_a, settings['n_cluster']))
 
     #  Init. clustering
-    # kmeans = KMeans(
-    #    n_cluster=settings['n_cluster'],
-    #    a_c_mat_0=a_c_mat_0
-    # )
-    kmeans_bc = KMeansBiasCorrected(
-        n_cluster=settings['n_cluster'],
-        a_c_mat_0=a_c_mat_0,
-        n_iter=settings['n_iter_alpha'],
-        estimate_sigma_n=settings['estimate_sigma_n'],
-        sigma_n=settings['sigma_n'],
-        min_alpha=settings['min_alpha']
-    )
-
-    # boost = Boosting(
-    #    cls=kmeans,
-    #    n_learner=settings['n_learner'],
-    #    n_iter_cls=settings['n_iter_cls']
-    # )
+    clustering = clust_selector(settings, a_c_mat_0)
 
     # Init. updaters
     approx_upd = ApproximateUpdater(x_mat_0=x_mat_0,
@@ -215,29 +205,29 @@ if __name__ == '__main__':
     multi_upd = MultiUpdaterWrapper(upds=[approx_upd, bfgs_upd])
 
     # Init. alternate
-    alt = Alternate(cls=kmeans_bc, upd=multi_upd)
+    alt = Alternate(clust=clustering, upd=multi_upd)
 
     # Init. logger
     logger = Logger(settings=settings, save_path=save_path, do_plot=do_plot)
 
     print('Init. done ...')
 
-    # ------- Fit Vandermonde -------
+    # ----- Fit Vandermonde -----
     vm.fit()
     vm.transform(x_mat_0)
 
-    # ------- Do the alternation -------
+    # ----- Do the alternation -----
     a_mat = alt.run(vm, rating_mat_tr, rating_mat_va, n_alter, min_value, max_value,
                     logger=logger,
                     rating_mat_te=rating_mat_te,
                     verbose=True)
 
-    # ------- Print the best validated result -------
+    # ----- Print the best validated result -----
     best_iter = np.argmin(logger.rmse_va)
     print('---> best iter: %d, rmse train: %.3f, rmse val: %.3f rmse test: %.3f' %
-          (int(best_iter), logger.rmse_tr[best_iter], logger.rmse_va[best_iter], logger.rmse_te[best_iter]))
+          (int(best_iter) + 1, logger.rmse_tr[best_iter], logger.rmse_va[best_iter], logger.rmse_te[best_iter]))
 
-    # ------- Save the results -------
+    # ----- Save the results -----
     if do_save:
         logger.save(ext={
             'x_mat': alt.upd.x_mat,
