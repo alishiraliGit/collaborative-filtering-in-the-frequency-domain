@@ -10,14 +10,17 @@ class MultiUpdaterWrapper(Updater):
 
         self.x_mat = upds[0].x_mat
 
-    def fit(self, vm: Vandermonde, a_mat, rating_mat):
+    def update_x(self, x_mat):
+        self.x_mat = x_mat
+
+    def fit(self, vm: Vandermonde, a_mat, rating_mat, propensity_mat=None):
         vm.transform(self.x_mat)
 
         for upd in self.upds:
 
-            upd.x_mat = self.x_mat
+            upd.update_x(self.x_mat)
 
-            self.x_mat = upd.fit_transform(vm, a_mat, rating_mat)
+            self.x_mat = upd.fit_transform(vm, a_mat, rating_mat, propensity_mat=propensity_mat)
 
         return
 

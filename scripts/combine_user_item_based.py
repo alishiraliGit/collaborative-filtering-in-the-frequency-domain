@@ -33,8 +33,8 @@ if __name__ == '__main__':
     model_load_path = os.path.join('..', 'results')
 
     # Files
-    u_filename = 'result-methodboosted_kmeans_approx_bfgs-dim_x3-m4-vm_typecos_mult-reg_typel2-reg_params-l2_lambda10-exclude_zero_freqTrue-clust_methodboosting-n_learner15-n_cluster2-n_iter_clust5-std_init_clust1e-02-gamma1-max_iter_bfgs5-2022-03-27 09-11-30'
-    i_filename = 'result-methodboosted_kmeans_approx_bfgs-dim_x3-m4-vm_typecos_mult-reg_typel2-reg_params-l2_lambda10-exclude_zero_freqTrue-clust_methodboosting-n_learner15-n_cluster2-n_iter_clust5-std_init_clust1e-02-gamma1-max_iter_bfgs5-2022-03-27 09-11-42'
+    u_filename = 'result-methodkmeans_approx_bfgs_bc-dim_x2-m3-vm_typecos_mult-reg_typel2-reg_params-l2_lambda1-exclude_zero_freqTrue-clust_methodk-means-bc-n_cluster10-std_init_clust1e-02-n_iter_alpha1-estimate_sigma_-2023-03-09 21-34-05'
+    i_filename = 'result-methodkmeans_approx_bfgs_bc-dim_x2-m3-vm_typecos_mult-reg_typel2-reg_params-l2_lambda1-exclude_zero_freqTrue-clust_methodk-means-bc-n_cluster10-std_init_clust1e-02-n_iter_alpha1-estimate_sigma_-2023-03-09 21-34-42'
 
     # Dataset
     min_value = 1
@@ -42,16 +42,16 @@ if __name__ == '__main__':
 
     # Other
     u_sett = {
-        'dim_x': 3,
-        'm': 4,
+        'dim_x': 2,
+        'm': 3,
         'vm_type': VandermondeType.COS_MULT,
         'reg_type': RegularizationType.L2,
         'reg_params': {'l2_lambda': 10, 'exclude_zero_freq': True},
     }
 
     i_sett = {
-        'dim_x': 3,
-        'm': 4,
+        'dim_x': 2,
+        'm': 3,
         'vm_type': VandermondeType.COS_MULT,
         'reg_type': RegularizationType.L2,
         'reg_params': {'l2_lambda': 10, 'exclude_zero_freq': True},
@@ -105,4 +105,6 @@ if __name__ == '__main__':
     y_pr = reg.predict(X_te)
 
     # ------- Evaluation -------
-    print('rmse test is: %.3f' % np.sqrt(np.mean((y_pr - y_te)**2)))
+    print('rmse u test is: %.3f' % np.sqrt(np.mean((u_rating_mat_pr[mask_te] - y_te)**2)))
+    print('rmse i test is: %.3f' % np.sqrt(np.mean((i_rating_mat_pr[mask_te] - y_te) ** 2)))
+    print('rmse combined test is: %.3f' % np.sqrt(np.mean((y_pr - y_te)**2)))

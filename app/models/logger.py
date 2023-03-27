@@ -33,6 +33,8 @@ class Logger:
 
     def save(self, ext=None):
         stringified = 'result' + Logger.stringify(self.settings)
+        if len(stringified) > 200:
+            stringified = stringified[:200]
 
         file_name = stringified + '-' + datetime.now().strftime('%Y-%m-%d %H-%M-%S')
 

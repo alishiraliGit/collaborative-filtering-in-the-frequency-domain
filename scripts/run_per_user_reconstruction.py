@@ -28,7 +28,7 @@ def get_approx_bfgs_settings():
     sett['vm_type'] = VandermondeType.COS_MULT
     # sett['reg_type'] = RegularizationType.L2
     # sett['reg_params'] = {'l2_lambda': 0.8, 'exclude_zero_freq': True}
-    sett['reg_type'] = RegularizationType.POST_MAX_SNR
+    sett['reg_type'] = RegularizationType.POST_MAX_SNR  # Post
     sett['reg_params'] = {'bound': (0, 0.2), 'exclude_zero_freq': False}
     # sett['reg_type'] = RegularizationType.POW
     # sett['reg_params'] = {'l2_lambda': 0.2, 'z': 1.5, 'exclude_zero_freq': True}
@@ -43,13 +43,16 @@ def get_approx_bfgs_settings():
     sett['gamma'] = 1  # default: 1
     sett['max_iter'] = 5  # default: 5
 
+    # MNAR
+    sett['obtain_tt'] = True
+
     return sett
 
 
 if __name__ == '__main__':
-    print('---- Started! ----')
+    print('----- Started! -----')
 
-    # ------- Settings -------
+    # ----- Settings -----
     # Method settings
     settings = get_approx_bfgs_settings()
 
@@ -67,10 +70,10 @@ if __name__ == '__main__':
 
     # Dataset
     dataset_name = 'coat'
-    min_value = 1
-    max_value = 5
+    dataset_part = np.nan
 
     # Cross-validation
+    test_split = np.nan
     val_split = 0.1
 
     # Item-based (True) or user-based
@@ -79,13 +82,23 @@ if __name__ == '__main__':
     # Alternation
     n_alter = 30
 
-    # ------- Load data -------
-    rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item =\
-        load_dataset(load_path, dataset_name, va_split=val_split, do_transpose=do_transpose, random_state=1)
+    # MNAR
+    obtain_tt = settings.get('obtain_tt', False)
+
+    # ----- Load data -----
+    rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item, min_value, max_value = \
+        load_dataset(load_path, dataset_name, part=dataset_part,
+                     va_split=val_split, te_split=test_split,
+                     do_transpose=do_transpose)
 
     print('Data loaded ...')
 
-    # ------- Initialization -------
+    # ----- Load IPS -----
+    # TODO
+    prop_mat = rating_mat_tr.copy()
+    prop_mat[~np.isnan(rating_mat_tr)] = np.mean((~np.isnan(rating_mat_tr)) * 1)
+
+    # ----- Initialization -----
     #  Init. VM
     vm = Vandermonde.get_instance(
         dim_x=settings['dim_x'],
@@ -100,7 +113,7 @@ if __name__ == '__main__':
 
     #  Init. clustering
     one_user_one_cluster = OneUserOneClusterBiasCorrected(
-        n_iter=settings['n_iter_alpha'],
+        n_iter_alpha=settings['n_iter_alpha'],
         estimate_sigma_n=settings['estimate_sigma_n'],
         sigma_n=settings['sigma_n'],
         min_alpha=settings['min_alpha']
@@ -129,10 +142,14 @@ if __name__ == '__main__':
     vm.transform(x_mat_0)
 
     # ------- Do the alternation -------
-    a_mat = alt.run(vm, rating_mat_tr, rating_mat_va, n_alter, min_value, max_value,
-                    rating_mat_te=rating_mat_te,
-                    logger=logger,
-                    verbose=True)
+    a_mat_opt, x_mat_opt = alt.run(
+        vm, rating_mat_tr, rating_mat_va, n_alter, min_value, max_value,
+        logger=logger,
+        rating_mat_te=rating_mat_te,
+        propensity_mat=prop_mat,
+        obtain_tt=obtain_tt,
+        verbose=True
+    )
 
     # ------- Print the best validated result -------
     best_iter = np.argmin(logger.rmse_va)
@@ -140,7 +157,7 @@ if __name__ == '__main__':
           (int(best_iter), logger.rmse_tr[best_iter], logger.rmse_va[best_iter], logger.rmse_te[best_iter]))
 
     # ------- Plot predictions -------
-    rating_mat_pr = vm.predict(a_mat)
+    rating_mat_pr = vm.predict(a_mat_opt)
     plt.figure(figsize=(8, 4))
 
     plt.subplot(1, 2, 1)
@@ -154,8 +171,8 @@ if __name__ == '__main__':
     # ------- Save the results -------
     if do_save:
         logger.save(ext={
-            'x_mat': alt.upd.x_mat,
-            'a_mat': a_mat,
+            'x_mat': x_mat_opt,
+            'a_mat': a_mat_opt,
             'rating_mat_tr': rating_mat_tr,
             'rating_mat_va': rating_mat_va,
             'rating_mat_te': rating_mat_te,

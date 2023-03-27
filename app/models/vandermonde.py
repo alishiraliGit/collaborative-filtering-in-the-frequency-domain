@@ -1,9 +1,11 @@
 import abc
 import numpy as np
+import torch
 
 from app.models.debiasing.optimumregularization import MinNoiseVarianceRegularization as MinNoiseReg
 from app.models.debiasing.optimumregularization import MaxSNRRegularization as MaxSNRReg
 from app.utils.mat_ops import vectorize_rows, e1
+from app.utils import pytorch_utils as ptu
 
 
 class VandermondeType:
@@ -15,6 +17,7 @@ class VandermondeType:
 class RegularizationType:
     L2 = 'l2'
     POW = 'pow'
+    MULT = 'mult'
     MIN_NOISE_VAR = 'min_noise_var'
     MAX_SNR = 'max_snr'
     POST_MAX_SNR = 'post_max_snr'
@@ -67,6 +70,10 @@ class Vandermonde(abc.ABC):
             z = self.reg_params['z']
             e1_mat = np.diag(e1(self.dim_a))*(self.reg_params['exclude_zero_freq']*1)
             c_mat = (np.diag(z**np.sum(self.v_mult, axis=1)) - e1_mat)*self.reg_params['l2_lambda']
+        elif self.reg_type == RegularizationType.MULT:
+            z = self.reg_params['z']
+            e1_mat = np.diag(e1(self.dim_a))*(self.reg_params['exclude_zero_freq']*1)
+            c_mat = (np.diag(1 + z*np.sum(self.v_mult, axis=1)) - e1_mat)*self.reg_params['l2_lambda']
         elif self.reg_type == RegularizationType.MIN_NOISE_VAR:
             c_mat = np.diag(MinNoiseReg(self.reg_params['bound'], self.reg_params['exclude_zero_freq']).find_c(
                 self.v_mat,
@@ -93,12 +100,38 @@ class Vandermonde(abc.ABC):
 
         return c_mat
 
-    def calc_a_users(self, users, rating_mat):
+    def calc_a_users(self, users, rating_mat, propensity_mat=None):
+        """
+        :param rating_mat:
+        :param users:
+        :param propensity_mat: should be nan for unobserved ratings
+        """
+        # Preprocess
+        if not isinstance(users, (list, np.ndarray)):  # if users is a number only
+            users = [users]
+
+        # Get V
         v_u_mat = self.get_v_users(users, rating_mat)
 
-        k_hat_mat = self.calc_k_hat(v_u_mat)
-
+        # Get ratings
         s_u = vectorize_rows(users, rating_mat)
+
+        # Get propensity scores
+        if propensity_mat is None:
+            p_n_u = np.ones(s_u.shape)
+        else:
+            p_u = vectorize_rows(users, propensity_mat)
+            # Normalize propensity scores
+            p_n_u = p_u*(len(users)*rating_mat.shape[1])/len(p_u)  # p*n/n_obs
+
+        # Normalize V and ratings with square root of inverse (normalized) propensity score
+        sqrt_inps = 1/np.sqrt(p_n_u)
+
+        v_u_mat *= sqrt_inps.T
+        s_u *= sqrt_inps
+
+        # Preprocess V
+        k_hat_mat = self.calc_k_hat(v_u_mat)
 
         # Check c_mat to be updated
         if not self.c_mat_is_updated:
@@ -127,6 +160,10 @@ class Vandermonde(abc.ABC):
         s_pr = a_mat.T.dot(self.v_mat)
         return s_pr
 
+    def predict_tensor(self, a_mat: torch.tensor):
+        s_pr = torch.matmul(a_mat.T, self.v_mat)
+        return s_pr
+
     @abc.abstractmethod
     def fit(self):
         pass
@@ -136,6 +173,7 @@ class Vandermonde(abc.ABC):
         pass
 
     def copy(self):
+        # Ignore the warning: child classes have different signature
         vm = self.__class__(self.dim_x, self.m, reg_type=self.reg_type, reg_params=self.reg_params)
 
         vm.v_mult = self.v_mult.copy()
@@ -284,3 +322,14 @@ class VandermondeCosMult(Vandermonde):
         self.c_mat_is_updated = False
 
         return self.v_mat
+
+    def transform_tensor(self, x_mat: torch.Tensor):
+        n_item = x_mat.shape[1]
+
+        self.v_mat = torch.zeros((self.dim_a, n_item))
+
+        for item in range(n_item):
+            x_i_diag = torch.diag(x_mat[:, item])
+
+            self.v_mat[:, item] = \
+                torch.prod(torch.cos(np.pi*torch.matmul(ptu.from_numpy(self.v_mult), x_i_diag)), dim=1)

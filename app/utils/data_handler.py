@@ -219,8 +219,24 @@ def get_rating_mat(edges, n_user, n_item):
     return rating_mat
 
 
+def load_propensity_scores(loadpath, name, do_transpose=False):
+    if name == 'coat':
+        file_path_prop = os.path.join(loadpath, 'propensities.ascii')
+
+        propensity_mat = np.genfromtxt(fname=file_path_prop, delimiter=' ', dtype=np.float)
+    else:
+        raise Exception('Cannot find propensity scores for %s.' % name)
+
+    if do_transpose:
+        propensity_mat = propensity_mat.T
+
+    return propensity_mat
+
+
 if __name__ == '__main__':
     load_path = os.path.join('..', '..', 'data', 'coat')
 
     rating_mat_tr, rating_mat_va, rating_mat_te, n_u, n_i, min_value, max_value = \
         load_dataset(load_path, 'coat', va_split=0.1, random_state=1)
+
+    prop_mat = load_propensity_scores(load_path, 'coat', do_transpose=False)

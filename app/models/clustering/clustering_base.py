@@ -8,24 +8,24 @@ from app.models.vandermonde import Vandermonde
 class Clustering(abc.ABC):
 
     @abc.abstractmethod
-    def fit(self, vm: Vandermonde, rating_mat):
+    def fit(self, vm: Vandermonde, rating_mat, propensity_mat=None):
         pass
 
     @abc.abstractmethod
-    def transform(self, vm: Vandermonde, rating_mat, **kwargs):
+    def transform(self, vm: Vandermonde, rating_mat, propensity_mat=None, **kwargs):
         pass
 
-    def fit_transform(self, vm: Vandermonde, rating_mat, **kwargs):
-        self.fit(vm, rating_mat)
+    def fit_transform(self, vm: Vandermonde, rating_mat, propensity_mat=None, **kwargs):
+        self.fit(vm, rating_mat, propensity_mat)
 
-        return self.transform(vm, rating_mat, **kwargs)
+        return self.transform(vm, rating_mat, propensity_mat, **kwargs)
 
     @abc.abstractmethod
     def copy(self, do_init):
         pass
 
     @staticmethod
-    def calc_a_clusters(users_clusters, vm: Vandermonde, rating_mat, n_cluster, verbose=False):
+    def calc_a_clusters(users_clusters, vm: Vandermonde, rating_mat, n_cluster, propensity_mat=None, verbose=False):
         a_c = np.zeros((vm.dim_a, n_cluster))
         are_valid = np.ones((n_cluster, ), dtype=bool)
 
@@ -36,6 +36,6 @@ class Clustering(abc.ABC):
                 are_valid[cluster] = False
                 continue
 
-            a_c[:, cluster] = vm.calc_a_users(users_c, rating_mat)[:, 0]
+            a_c[:, cluster] = vm.calc_a_users(users_c, rating_mat, propensity_mat)[:, 0]
 
         return a_c, are_valid

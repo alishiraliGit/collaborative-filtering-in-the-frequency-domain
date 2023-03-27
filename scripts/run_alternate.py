@@ -3,12 +3,14 @@ import warnings
 import numpy as np
 from numpy.random import default_rng
 import os
+import torch.optim as optim
 
-from app.utils.data_handler import load_dataset
+from app.utils.data_handler import load_dataset, load_propensity_scores
+from app.utils.pytorch_optim_utils import OptimizerSpec, ConstantSchedule
 from app.models.vandermonde import Vandermonde, VandermondeType, RegularizationType
 from core.alternate import Alternate
 from app.models.clustering.kmeans import KMeans, KMeansBiasCorrected
-from app.models.clustering.boosting import Boosting
+from app.models.clustering.boosting import Boosting, BoostingBiasCorrected
 from app.models.updating.approximate_updater import ApproximateUpdater
 from app.models.updating.bfgs import BFGS
 from app.models.updating.multi_updater_wrapper import MultiUpdaterWrapper
@@ -50,7 +52,7 @@ def get_kmeans_approx_bfgs_settings():
 def get_kmeans_approx_bfgs_bc_settings():
     sett = {}
 
-    method = 'kmeans_approx_bfgs'
+    method = 'kmeans_approx_bfgs_bc'
 
     sett['method'] = method
 
@@ -59,23 +61,68 @@ def get_kmeans_approx_bfgs_bc_settings():
     sett['m'] = 3
     sett['vm_type'] = VandermondeType.COS_MULT
     sett['reg_type'] = RegularizationType.L2
-    sett['reg_params'] = {'l2_lambda': 0.2, 'exclude_zero_freq': False}
+    sett['reg_params'] = {'l2_lambda': 1, 'exclude_zero_freq': True}
     # sett['reg_type'] = RegularizationType.POST_MAX_SNR
-    # sett['reg_params'] = {'bound': (0, 0.2), 'exclude_zero_freq': False}
+    # sett['reg_params'] = {'bound': (0, 1), 'exclude_zero_freq': True}
+    # sett['reg_type'] = RegularizationType.POW
+    # sett['reg_params'] = {'l2_lambda': 1, 'z': 1, 'exclude_zero_freq': True}  # z=1.2
 
     # Clustering settings
-    sett['cls'] = 'k-means'
-    sett['n_cluster'] = 5
-    sett['cls_init_std'] = 0.1
+    sett['clust_method'] = 'k-means-bc'
+    sett['n_cluster'] = 10
+    sett['n_iter_clust'] = 1
+    sett['std_init_clust'] = 0.01  # default: 1e-2
 
+    # Bias correction
     sett['n_iter_alpha'] = 1
     sett['estimate_sigma_n'] = False
-    sett['sigma_n'] = 0
+    sett['sigma_n'] = 0.6  # 0.6
     sett['min_alpha'] = 0
 
     # Updater settings
     sett['gamma'] = 1
     sett['max_iter_bfgs'] = 5
+
+    # MNAR
+    sett['obtain_tt'] = True  # True if at test time the predictor needs to be updated
+
+    return sett
+
+
+def get_boosted_kmeans_approx_adam_settings():
+    sett = {}
+
+    method = 'boosted_kmeans_approx_bfgs'
+
+    sett['method'] = method
+
+    # --- Vandermonde settings ---
+    sett['dim_x'] = 3
+    sett['m'] = 2
+    sett['vm_type'] = VandermondeType.COS_MULT
+    # Reg.
+    sett['reg_type'] = RegularizationType.L2
+    sett['reg_params'] = {'l2_lambda': 30, 'exclude_zero_freq': True}
+
+    # --- Clustering settings ---
+    sett['clust_method'] = 'boosting'
+    sett['n_learner'] = 10
+    sett['n_cluster'] = 2  # Default: 2
+    sett['n_iter_clust'] = 5  # Default: 5
+    sett['std_init_clust'] = 1e-2  # Default: 1e-2
+
+    # --- Updater(s) settings ---
+    # Approx.
+    sett['gamma'] = 1  # Default: 1
+    # Adam
+    sett['n_iter'] = 10
+    sett['optimizer_spec'] = OptimizerSpec(
+        constructor=optim.Adam,
+        optim_kwargs=dict(
+            lr=1,
+        ),
+        learning_rate_schedule=ConstantSchedule(1e-1).value,
+    )
 
     return sett
 
@@ -88,8 +135,8 @@ def get_boosted_kmeans_approx_bfgs_settings():
     sett['method'] = method
 
     # --- Vandermonde settings ---
-    sett['dim_x'] = 3
-    sett['m'] = 4
+    sett['dim_x'] = 2
+    sett['m'] = 3
     sett['vm_type'] = VandermondeType.COS_MULT
     # Reg.
     sett['reg_type'] = RegularizationType.L2
@@ -97,16 +144,55 @@ def get_boosted_kmeans_approx_bfgs_settings():
 
     # --- Clustering settings ---
     sett['clust_method'] = 'boosting'
-    sett['n_learner'] = 15
-    sett['n_cluster'] = 2
-    sett['n_iter_clust'] = 5
-    sett['std_init_clust'] = 1e-2
+    sett['n_learner'] = 10
+    sett['n_cluster'] = 2  # Default: 2
+    sett['n_iter_clust'] = 5  # Default: 5
+    sett['std_init_clust'] = 1e-2  # Default: 1e-2
 
     # --- Updater(s) settings ---
     # Approx.
-    sett['gamma'] = 1
+    sett['gamma'] = 1  # Default: 1
     # BFGS
+    sett['max_iter_bfgs'] = 5  # Default: 5
+
+    return sett
+
+
+def get_boosted_kmeans_approx_bfgs_bc_settings():
+    sett = {}
+
+    method = 'boosted_kmeans_approx_bfgs_bc'
+
+    sett['method'] = method
+
+    # Vandermonde settings
+    sett['dim_x'] = 2
+    sett['m'] = 3
+    sett['vm_type'] = VandermondeType.COS_MULT
+    # sett['reg_type'] = RegularizationType.L2
+    # sett['reg_params'] = {'l2_lambda': 10, 'exclude_zero_freq': True}
+    sett['reg_type'] = RegularizationType.POW
+    sett['reg_params'] = {'l2_lambda': 10, 'z': 1.2, 'exclude_zero_freq': True}  # z=1.3, iter=4
+
+    # Clustering settings
+    sett['clust_method'] = 'boosting-bc'
+    sett['n_learner'] = 10
+    sett['n_cluster'] = 2  # Default: 2
+    sett['n_iter_clust'] = 5  # Default: 5
+    sett['std_init_clust'] = 1e-2  # Default: 1e-2
+
+    # Bias correction
+    sett['n_iter_alpha'] = 1
+    sett['estimate_sigma_n'] = True
+    sett['sigma_n'] = np.nan  # 0.6 or 0.8
+    sett['min_alpha'] = 0
+
+    # Updater settings
+    sett['gamma'] = 1
     sett['max_iter_bfgs'] = 5
+
+    # MNAR
+    sett['obtain_tt'] = True  # True if at test time the predictor needs to be updated
 
     return sett
 
@@ -119,11 +205,11 @@ def clust_selector(sett, a_clust_mat_0):
             a_c_mat_0=a_clust_mat_0
         )
     elif sett['clust_method'] == 'k-means-bc':
-        # ToDo
         return KMeansBiasCorrected(
             n_cluster=sett['n_cluster'],
+            n_iter=sett['n_iter_clust'],
             a_c_mat_0=a_clust_mat_0,
-            n_iter=sett['n_iter_alpha'],
+            n_iter_alpha=sett['n_iter_alpha'],
             estimate_sigma_n=sett['estimate_sigma_n'],
             sigma_n=sett['sigma_n'],
             min_alpha=sett['min_alpha']
@@ -138,37 +224,57 @@ def clust_selector(sett, a_clust_mat_0):
            clust=kmeans,
            n_learner=sett['n_learner']
         )
+    elif sett['clust_method'] == 'boosting-bc':
+        kmeans_bc = KMeansBiasCorrected(
+            n_cluster=sett['n_cluster'],
+            n_iter=sett['n_iter_clust'],
+            a_c_mat_0=a_clust_mat_0,
+            n_iter_alpha=sett['n_iter_alpha'],
+            estimate_sigma_n=sett['estimate_sigma_n'],
+            sigma_n=sett['sigma_n'],
+            min_alpha=sett['min_alpha']
+        )
+        return BoostingBiasCorrected(
+           clust=kmeans_bc,
+           n_learner=sett['n_learner']
+        )
 
 
 if __name__ == '__main__':
     # ----- Settings -----
     # Method
-    settings = get_boosted_kmeans_approx_bfgs_settings()
+    settings = get_boosted_kmeans_approx_bfgs_bc_settings()
     print(settings)
 
     # General
     do_plot = True
-    do_save = True
+    do_save = False
 
     # Item-based (True) or user-based
-    do_transpose = True
+    do_transpose = False
 
     # Alternation
     n_alter = 10
 
     # Dataset
-    dataset_name = 'ml-100k'
-    dataset_part = 5
+    dataset_name = 'coat'
+    dataset_part = np.nan
 
     # Cross-validation
     test_split = np.nan
-    val_split = 0.02/(1 - 0.2)
+    val_split = 0.1  # 0.02/(1 - 0.2)
 
     # Path
-    load_path = os.path.join('..', 'data', 'ml-100k')
+    load_path = os.path.join('..', 'data', 'coat')
 
     save_path = os.path.join('..', 'results')
     os.makedirs(save_path, exist_ok=True)
+
+    # IPS
+    do_ips = False
+
+    # MNAR
+    obtain_tt = settings.get('obtain_tt', False)
 
     # ----- Load data -----
     rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item, min_value, max_value = \
@@ -177,6 +283,14 @@ if __name__ == '__main__':
                      do_transpose=do_transpose)
 
     print('Data loaded ...')
+
+    # ----- Load IPS -----
+    if do_ips:
+        prop_mat = load_propensity_scores(load_path, dataset_name, do_transpose=do_transpose)
+        prop_mat[np.isnan(rating_mat_tr)] = np.nan
+    else:
+        prop_mat = rating_mat_tr.copy()
+        prop_mat[~np.isnan(rating_mat_tr)] = np.mean((~np.isnan(rating_mat_tr))*1)
 
     # ----- Initialization -----
     #  Init. Vandermonde
@@ -217,10 +331,14 @@ if __name__ == '__main__':
     vm.transform(x_mat_0)
 
     # ----- Do the alternation -----
-    a_mat = alt.run(vm, rating_mat_tr, rating_mat_va, n_alter, min_value, max_value,
-                    logger=logger,
-                    rating_mat_te=rating_mat_te,
-                    verbose=True)
+    a_mat_opt, x_mat_opt = alt.run(
+        vm, rating_mat_tr, rating_mat_va, n_alter, min_value, max_value,
+        logger=logger,
+        rating_mat_te=rating_mat_te,
+        propensity_mat=prop_mat,
+        obtain_tt=obtain_tt,
+        verbose=True
+    )
 
     # ----- Print the best validated result -----
     best_iter = np.argmin(logger.rmse_va)
@@ -230,8 +348,8 @@ if __name__ == '__main__':
     # ----- Save the results -----
     if do_save:
         logger.save(ext={
-            'x_mat': alt.upd.x_mat,
-            'a_mat': a_mat,
+            'x_mat': x_mat_opt,
+            'a_mat': a_mat_opt,
             'rating_mat_tr': rating_mat_tr,
             'rating_mat_va': rating_mat_va,
             'rating_mat_te': rating_mat_te,

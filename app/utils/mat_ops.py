@@ -2,14 +2,20 @@ import numpy as np
 from scipy.special import binom
 
 
-def vectorize_rows(rows_indices, mat):
+def vectorize_rows(rows_indices, mat, mask=None):
     """
     :param rows_indices:
     :param mat:
+    :param mask:
     :return: [-1 x 1]
     """
     vec_rows = vectorize(mat[rows_indices], order='C')
-    return vec_rows[~np.isnan(vec_rows)].reshape((-1, 1))
+
+    if mask is None:
+        return vec_rows[~np.isnan(vec_rows)].reshape((-1, 1))
+    else:
+        vec_rows_mask = vectorize(mask[rows_indices], order='C')
+        return vec_rows[vec_rows_mask].reshape((-1, 1))
 
 
 def vectorize(mat, order):
