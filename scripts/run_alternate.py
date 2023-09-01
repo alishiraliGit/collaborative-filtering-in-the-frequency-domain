@@ -1,5 +1,3 @@
-import warnings
-
 import numpy as np
 from numpy.random import default_rng
 import os
@@ -15,8 +13,6 @@ from app.models.updating.approximate_updater import ApproximateUpdater
 from app.models.updating.bfgs import BFGS
 from app.models.updating.multi_updater_wrapper import MultiUpdaterWrapper
 from app.models.logger import Logger
-
-rng = default_rng(1)
 
 
 def get_kmeans_approx_bfgs_settings():
@@ -243,12 +239,14 @@ def clust_selector(sett, a_clust_mat_0):
 if __name__ == '__main__':
     # ----- Settings -----
     # Method
-    settings = get_boosted_kmeans_approx_bfgs_bc_settings()
+    settings = get_boosted_kmeans_approx_bfgs_settings()
     print(settings)
 
     # General
     do_plot = True
     do_save = False
+    random_seed = 1
+    rng = default_rng(random_seed)
 
     # Item-based (True) or user-based
     do_transpose = False
@@ -257,15 +255,15 @@ if __name__ == '__main__':
     n_alter = 10
 
     # Dataset
-    dataset_name = 'coat'
+    dataset_name = 'yahoo-r3'
     dataset_part = np.nan
 
     # Cross-validation
-    test_split = np.nan
-    val_split = 0.1  # 0.02/(1 - 0.2)
+    test_split = 0.1
+    val_split = 0.05
 
     # Path
-    load_path = os.path.join('..', 'data', 'coat')
+    load_path = os.path.join('..', 'data', 'yahoo-r3')
 
     save_path = os.path.join('..', 'results')
     os.makedirs(save_path, exist_ok=True)
@@ -277,10 +275,12 @@ if __name__ == '__main__':
     obtain_tt = settings.get('obtain_tt', False)
 
     # ----- Load data -----
-    rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item, min_value, max_value = \
-        load_dataset(load_path, dataset_name, part=dataset_part,
-                     va_split=val_split, te_split=test_split,
-                     do_transpose=do_transpose)
+    rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item, min_value, max_value = load_dataset(
+        load_path, dataset_name, part=dataset_part,
+        va_split=val_split, te_split=test_split,
+        do_transpose=do_transpose,
+        random_state=random_seed
+    )
 
     print('Data loaded ...')
 

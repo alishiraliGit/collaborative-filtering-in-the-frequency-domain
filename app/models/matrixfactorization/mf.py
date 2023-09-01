@@ -12,15 +12,15 @@ class MatrixFactorization:
             rat_mat_te=None,
             logger: Logger=None):
 
-            for alt in range(n_alt):
-                w_u, w_i, b_u, b_i = self.als.fit_transform(rat_mat_tr, n_alt=1)
+        for alt in range(n_alt):
+            w_u, w_i, b_u, b_i = self.als.fit_transform(rat_mat_tr, n_alt=1)
 
-                if isinstance(logger, Logger):
-                    rmse_tr = self.calc_prediction_rmse(w_u, w_i, b_u, b_i, rat_mat_tr, min_val, max_val)
-                    rmse_va = self.calc_prediction_rmse(w_u, w_i, b_u, b_i, rat_mat_va, min_val, max_val)
-                    rmse_te = self.calc_prediction_rmse(w_u, w_i, b_u, b_i, rat_mat_te, min_val, max_val)
+            if isinstance(logger, Logger):
+                rmse_tr = self.calc_prediction_rmse(w_u, w_i, b_u, b_i, rat_mat_tr, min_val, max_val)
+                rmse_va = self.calc_prediction_rmse(w_u, w_i, b_u, b_i, rat_mat_va, min_val, max_val)
+                rmse_te = self.calc_prediction_rmse(w_u, w_i, b_u, b_i, rat_mat_te, min_val, max_val)
 
-                    logger.log(rmse_tr, rmse_va, rmse_te)
+                logger.log(rmse_tr, rmse_va, rmse_te)
 
     @staticmethod
     def predict(w_u, w_i, b_u, b_i, min_val, max_val):

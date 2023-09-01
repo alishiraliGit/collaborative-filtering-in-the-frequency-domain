@@ -150,6 +150,21 @@ def load_dataset(loadpath, name, va_split=None, te_split=None, do_transpose=Fals
         min_val = 1
         max_val = 5
 
+    elif name == 'yahoo-r3':
+        edges_notmapped = get_edge_list_from_file_yahoo_r3(loadpath, 'ydata-ymusic-rating-study-v1_0-train.txt')
+        edges, map_u, map_i, num_user, num_item = map_ids(edges_notmapped)
+
+        edges_tr_va, edges_te = train_test_split(edges, test_size=te_split, random_state=random_state)
+        edges_tr, edges_va = train_test_split(edges_tr_va, test_size=va_split/(1 - te_split), random_state=random_state)
+
+        rat_mat_tr = get_rating_mat(edges_tr, num_user, num_item)
+        rat_mat_va = get_rating_mat(edges_va, num_user, num_item)
+        rat_mat_te = get_rating_mat(edges_te, num_user, num_item)
+
+        # From dataset spec
+        min_val = 1
+        max_val = 5
+
     else:
         raise Exception('%s is not a valid dataset.' % name)
 
@@ -182,6 +197,19 @@ def get_edge_list_from_file_ml1m(file_path, file_name):
 
         for row in data_reader:
             user, item, value = int(row[0]), int(row[2]), float(row[4])
+
+            edges += [(user, item, value)]
+
+    return edges
+
+
+def get_edge_list_from_file_yahoo_r3(file_path, file_name):
+    edges = []
+    with open(file_path + '/' + file_name) as data_file:
+        data_reader = csv.reader(data_file, delimiter='\t')
+
+        for row in data_reader:
+            user, item, value = int(row[0]), int(row[1]), float(row[2])
 
             edges += [(user, item, value)]
 
@@ -234,9 +262,7 @@ def load_propensity_scores(loadpath, name, do_transpose=False):
 
 
 if __name__ == '__main__':
-    load_path = os.path.join('..', '..', 'data', 'coat')
+    load_path = os.path.join('..', '..', 'data', 'yahoo-r3')
 
     rating_mat_tr, rating_mat_va, rating_mat_te, n_u, n_i, min_value, max_value = \
-        load_dataset(load_path, 'coat', va_split=0.1, random_state=1)
-
-    prop_mat = load_propensity_scores(load_path, 'coat', do_transpose=False)
+        load_dataset(load_path, 'yahoo-r3', va_split=0.05, te_split=0.1, random_state=1)
