@@ -33,8 +33,8 @@ if __name__ == '__main__':
     model_load_path = os.path.join('..', 'results')
 
     # Files
-    u_filename = 'result-methodkmeans_approx_bfgs_bc-dim_x2-m3-vm_typecos_mult-reg_typel2-reg_params-l2_lambda1-exclude_zero_freqTrue-clust_methodk-means-bc-n_cluster10-std_init_clust1e-02-n_iter_alpha1-estimate_sigma_-2023-03-09 21-34-05'
-    i_filename = 'result-methodkmeans_approx_bfgs_bc-dim_x2-m3-vm_typecos_mult-reg_typel2-reg_params-l2_lambda1-exclude_zero_freqTrue-clust_methodk-means-bc-n_cluster10-std_init_clust1e-02-n_iter_alpha1-estimate_sigma_-2023-03-09 21-34-42'
+    u_filename = 'result-methodboosted_kmeans_approx_bfgs-dim_x2-m3-vm_typecos_mult-reg_typel2-reg_params-l2_lambda10-exclude_zero_freqTrue-clust_methodboosting-n_learner7-n_cluster2-n_iter_clust5-std_init_clust1e-02-g-2023-09-01 23-13-53'
+    i_filename = 'result-methodboosted_kmeans_approx_bfgs-dim_x2-m4-vm_typecos_mult-reg_typel2-reg_params-l2_lambda10-exclude_zero_freqTrue-clust_methodboosting-n_learner10-n_cluster2-n_iter_clust5-std_init_clust1e-02--2023-09-01 23-26-39'
 
     # Dataset
     min_value = 1
@@ -51,7 +51,7 @@ if __name__ == '__main__':
 
     i_sett = {
         'dim_x': 2,
-        'm': 3,
+        'm': 4,
         'vm_type': VandermondeType.COS_MULT,
         'reg_type': RegularizationType.L2,
         'reg_params': {'l2_lambda': 10, 'exclude_zero_freq': True},
@@ -85,6 +85,7 @@ if __name__ == '__main__':
 
     # ------- Combine predictions -------
     reg = LinearRegression()
+    # reg = LogisticRegression()
 
     # Fitting
     mask_va = ~np.isnan(rating_mat_va)
@@ -93,6 +94,9 @@ if __name__ == '__main__':
                            i_rating_mat_pr[mask_va].reshape((-1, 1))), axis=1)
     y_va = rating_mat_va[mask_va]
 
+    # c = 10
+    # X_va = np.arctanh((X_va - (max_value + min_value)/2)/(max_value - min_value))/c
+    # y_va = np.arctanh((y_va - (max_value + min_value)/2)/(max_value - min_value))/c
     reg.fit(X_va, y_va)
 
     # Prediction
@@ -102,7 +106,13 @@ if __name__ == '__main__':
                            i_rating_mat_pr[mask_te].reshape((-1, 1))), axis=1)
     y_te = rating_mat_te[mask_te]
 
+    # X_te = np.arctanh((X_te - (max_value + min_value)/2)/(max_value - min_value))/c
+
     y_pr = reg.predict(X_te)
+    # y_pr = np.tanh(y_pr*c)*(max_value - min_value) + (max_value + min_value)/2
+
+    y_pr[y_pr > max_value] = max_value
+    y_pr[y_pr < min_value] = min_value
 
     # ------- Evaluation -------
     print('rmse u test is: %.3f' % np.sqrt(np.mean((u_rating_mat_pr[mask_te] - y_te)**2)))

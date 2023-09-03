@@ -9,7 +9,7 @@ from app.models.vandermonde import Vandermonde, VandermondeType, RegularizationT
 from core.alternate import Alternate
 from app.models.clustering.kmeans import KMeans, KMeansBiasCorrected
 from app.models.clustering.boosting import Boosting, BoostingBiasCorrected
-from app.models.updating.approximate_updater import ApproximateUpdater
+from app.models.updating.approximate_updater import ApproximateUpdater, ApproximateExpandedUpdater
 from app.models.updating.bfgs import BFGS
 from app.models.updating.multi_updater_wrapper import MultiUpdaterWrapper
 from app.models.logger import Logger
@@ -132,7 +132,7 @@ def get_boosted_kmeans_approx_bfgs_settings():
 
     # --- Vandermonde settings ---
     sett['dim_x'] = 2
-    sett['m'] = 3
+    sett['m'] = 4
     sett['vm_type'] = VandermondeType.COS_MULT
     # Reg.
     sett['reg_type'] = RegularizationType.L2
@@ -244,12 +244,12 @@ if __name__ == '__main__':
 
     # General
     do_plot = True
-    do_save = False
+    do_save = True
     random_seed = 1
     rng = default_rng(random_seed)
 
     # Item-based (True) or user-based
-    do_transpose = False
+    do_transpose = True
 
     # Alternation
     n_alter = 10
@@ -288,9 +288,11 @@ if __name__ == '__main__':
     if do_ips:
         prop_mat = load_propensity_scores(load_path, dataset_name, do_transpose=do_transpose)
         prop_mat[np.isnan(rating_mat_tr)] = np.nan
+        # Normalize propensity scores
+        prop_mat /= np.mean((~np.isnan(rating_mat_tr))*1)
     else:
         prop_mat = rating_mat_tr.copy()
-        prop_mat[~np.isnan(rating_mat_tr)] = np.mean((~np.isnan(rating_mat_tr))*1)
+        prop_mat[~np.isnan(rating_mat_tr)] = 1
 
     # ----- Initialization -----
     #  Init. Vandermonde
@@ -342,8 +344,8 @@ if __name__ == '__main__':
 
     # ----- Print the best validated result -----
     best_iter = np.argmin(logger.rmse_va)
-    print('---> best iter: %d, rmse train: %.3f, rmse val: %.3f rmse test: %.3f' %
-          (int(best_iter) + 1, logger.rmse_tr[best_iter], logger.rmse_va[best_iter], logger.rmse_te[best_iter]))
+    print('--->\tbest it\trmse tr\trmse va\trmse te\n\t\t%.3f\t%.3f\t%.3f\t%.3f' %
+          (best_iter + 1, logger.rmse_tr[best_iter], logger.rmse_va[best_iter], logger.rmse_te[best_iter]))
 
     # ----- Save the results -----
     if do_save:

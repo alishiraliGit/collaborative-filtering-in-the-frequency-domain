@@ -32,7 +32,7 @@ class KMeansOneIter(Clustering):
 
             # Get propensity scores
             if propensity_mat is None:
-                p_u = np.ones(s_u.shape)*len(s_u)/n_item  # Normalization is unnecessary
+                p_u = np.ones(s_u.shape)  # Normalization is unnecessary
             else:
                 p_u = vectorize_rows(user, propensity_mat)
 

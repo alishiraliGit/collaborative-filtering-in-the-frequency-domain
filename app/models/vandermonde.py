@@ -118,14 +118,12 @@ class Vandermonde(abc.ABC):
 
         # Get propensity scores
         if propensity_mat is None:
-            p_n_u = np.ones(s_u.shape)
+            p_u = np.ones(s_u.shape)
         else:
             p_u = vectorize_rows(users, propensity_mat)
-            # Normalize propensity scores
-            p_n_u = p_u*(len(users)*rating_mat.shape[1])/len(p_u)  # p*n/n_obs
 
         # Normalize V and ratings with square root of inverse (normalized) propensity score
-        sqrt_inps = 1/np.sqrt(p_n_u)
+        sqrt_inps = 1/np.sqrt(p_u)
 
         v_u_mat *= sqrt_inps.T
         s_u *= sqrt_inps

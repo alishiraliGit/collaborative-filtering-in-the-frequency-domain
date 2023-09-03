@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.random import default_rng
 import os
 from sklearn.linear_model import LinearRegression
 
@@ -164,7 +165,7 @@ def get_boosted_kmeans_approx_bfgs_settings():
     sett['method'] = method
 
     # --- Vandermonde settings ---
-    sett['dim_x'] = 3
+    sett['dim_x'] = 2
     sett['m'] = 4
     sett['vm_type'] = VandermondeType.COS_MULT
     # Reg.
@@ -198,30 +199,36 @@ if __name__ == '__main__':
     print(settings_u)
 
     # General
-    do_plot = False
+    do_plot = True
+    do_save = False
+    random_seed = 1
+    rng = default_rng(random_seed)
 
     # Path
-    load_path = os.path.join('..', 'data', 'ml-100k')
+    load_path = os.path.join('..', 'data', 'yahoo-r3')
 
     save_path = os.path.join('..', 'results')
     os.makedirs(save_path, exist_ok=True)
 
     # Dataset
-    dataset_name = 'ml-100k'
-    dataset_part = 3
+    dataset_name = 'yahoo-r3'
+    dataset_part = np.nan
 
     # Cross-validation
-    test_split = np.nan
-    val_split = 0.1/(1 - 0.2)
+    test_split = 0.1
+    val_split = 0.05
 
     # Alternation settings
     n_iter = 5
+    n_alter = 3
 
     # ------- Load data -------
-    rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item, min_value, max_value = \
-        load_dataset(load_path, dataset_name, part=dataset_part,
-                     va_split=val_split, te_split=test_split,
-                     do_transpose=False)
+    rating_mat_tr, rating_mat_va, rating_mat_te, n_user, n_item, min_value, max_value = load_dataset(
+        load_path, dataset_name, part=dataset_part,
+        va_split=val_split, te_split=test_split,
+        do_transpose=False,
+        random_state=random_seed
+    )
 
     print('Data loaded ...')
 
@@ -257,10 +264,10 @@ if __name__ == '__main__':
 
     for it in range(n_iter):
         # ToDo
-        if it == 0:
-            n_alter = 3
-        else:
-            n_alter = 3
+        # if it == 0:
+        #     n_alter = 3
+        # else:
+        #     n_alter = 3
 
         # ------- Initialization -------
         #  Init. Vandermonde
@@ -324,14 +331,14 @@ if __name__ == '__main__':
         logger_i.rmse_va = []
 
         print('--- Alternating for user-based method: ---')
-        a_mat_u_res = alt_u.run(vm_u, rating_mat_tr_u_res, rating_mat_va_u_res, n_alter, -np.inf, np.inf,
-                                logger=logger_u,
-                                rating_mat_te=rating_mat_te_u_res)
+        a_mat_u_res, _ = alt_u.run(vm_u, rating_mat_tr_u_res, rating_mat_va_u_res, n_alter, -np.inf, np.inf,
+                                   logger=logger_u,
+                                   rating_mat_te=rating_mat_te_u_res)
 
         print('--- Alternating for item-based method: ---')
-        a_mat_i_res = alt_i.run(vm_i, rating_mat_tr_i_res, rating_mat_va_i_res, n_alter, -np.inf, np.inf,
-                                logger=logger_i,
-                                rating_mat_te=rating_mat_te_i_res)
+        a_mat_i_res, _ = alt_i.run(vm_i, rating_mat_tr_i_res, rating_mat_va_i_res, n_alter, -np.inf, np.inf,
+                                   logger=logger_i,
+                                   rating_mat_te=rating_mat_te_i_res)
 
         # ------- Do regression -------
         _, x_ui_tr, y_tr = fit_reg(vm_u, a_mat_u_res, mean_mat_u_res,
@@ -382,6 +389,7 @@ if __name__ == '__main__':
         rating_mat_te_i_res = rating_mat_te_res.T - mean_mat_i_res
 
     # ------- Save the results -------
-    logger.save()
-    logger_u.save()
-    logger_i.save()
+    if do_save:
+        logger.save()
+        logger_u.save()
+        logger_i.save()

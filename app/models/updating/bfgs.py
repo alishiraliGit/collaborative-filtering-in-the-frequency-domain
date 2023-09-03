@@ -68,7 +68,7 @@ class BFGS(Updater):
 
         # Get propensity scores
         if propensity_mat is None:
-            p_i = np.ones(err_not_nan.shape)*len(err_not_nan)/len(err)
+            p_i = np.ones(err_not_nan.shape)
         else:
             p_i = propensity_mat[~np.isnan(err[:, 0]), item:(item + 1)]
 
@@ -100,7 +100,7 @@ class BFGS(Updater):
         # Get propensity scores
         if propensity_mat is None:
             n_observed_users_i = len(rated_users_i)
-            p_i = np.ones((n_observed_users_i, 1))*n_observed_users_i/len(rating_mat_i)  # Normalization is unnecessary
+            p_i = np.ones((n_observed_users_i, 1))  # Normalization is unnecessary
         else:
             p_i = propensity_mat[rated_users_i, item:(item + 1)]
 
@@ -167,7 +167,7 @@ class BFGS(Updater):
 
         # Get propensity scores
         if propensity_mat is None:
-            p_i = np.ones(s_i.shape)*len(rated_users_i)/len(rating_mat_i)  # Normalization is unnecessary
+            p_i = np.ones(s_i.shape)  # Normalization is unnecessary
         else:
             p_i = propensity_mat[rated_users_i, item:(item + 1)]
 
