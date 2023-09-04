@@ -131,12 +131,12 @@ def get_boosted_kmeans_approx_bfgs_settings():
     sett['method'] = method
 
     # --- Vandermonde settings ---
-    sett['dim_x'] = 2
-    sett['m'] = 4
+    sett['dim_x'] = 3
+    sett['m'] = 7
     sett['vm_type'] = VandermondeType.COS_MULT
     # Reg.
     sett['reg_type'] = RegularizationType.L2
-    sett['reg_params'] = {'l2_lambda': 10, 'exclude_zero_freq': True}
+    sett['reg_params'] = {'l2_lambda': 30, 'exclude_zero_freq': True}
 
     # --- Clustering settings ---
     sett['clust_method'] = 'boosting'
@@ -243,27 +243,27 @@ if __name__ == '__main__':
     print(settings)
 
     # General
-    do_plot = True
-    do_save = True
+    do_plot = False
+    do_save = False
     random_seed = 1
     rng = default_rng(random_seed)
 
     # Item-based (True) or user-based
-    do_transpose = True
+    do_transpose = False
 
     # Alternation
     n_alter = 10
 
     # Dataset
-    dataset_name = 'yahoo-r3'
-    dataset_part = np.nan
+    dataset_name = 'ml-100k'
+    dataset_part = 3
 
     # Cross-validation
-    test_split = 0.1
+    test_split = 0.2
     val_split = 0.05
 
     # Path
-    load_path = os.path.join('..', 'data', 'yahoo-r3')
+    load_path = os.path.join('..', 'data', 'ml-100k')
 
     save_path = os.path.join('..', 'results')
     os.makedirs(save_path, exist_ok=True)

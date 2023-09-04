@@ -17,7 +17,8 @@ def load_dataset(loadpath, name, va_split=None, te_split=None, do_transpose=Fals
         edges, map_u, map_i, num_user, num_item = map_ids(edges_notmapped_tr_va + edges_notmapped_te)
 
         edges_tr_va = edges[:len(edges_notmapped_tr_va)]
-        edges_tr, edges_va = train_test_split(edges_tr_va, test_size=va_split, random_state=random_state)
+        assert te_split == 0.2, 'test split is not consistent with predefined test sets.'
+        edges_tr, edges_va = train_test_split(edges_tr_va, test_size=va_split/(1 - te_split), random_state=random_state)
         edges_te = edges[len(edges_notmapped_tr_va):]
 
         rat_mat_tr = get_rating_mat(edges_tr, num_user, num_item)

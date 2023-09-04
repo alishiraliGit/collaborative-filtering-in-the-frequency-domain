@@ -6,7 +6,7 @@ from app.models.logger import Logger
 from app.models.vandermonde import Vandermonde, VandermondeType, RegularizationType
 
 
-def fit_vm_and_predict(x_mat, a_mat, settings, min_val, max_val):
+def fit_vm_and_predict(x_mat, a_mat, settings, min_val, max_val, truncate=True):
     # Init. and fit a VM
     vm = Vandermonde.get_instance(
         dim_x=settings['dim_x'],
@@ -21,8 +21,9 @@ def fit_vm_and_predict(x_mat, a_mat, settings, min_val, max_val):
 
     # Predict
     rat_pre = vm.predict(a_mat)
-    rat_pre[rat_pre > max_val] = max_val
-    rat_pre[rat_pre < min_val] = min_val
+    if truncate:
+        rat_pre[rat_pre > max_val] = max_val
+        rat_pre[rat_pre < min_val] = min_val
 
     return rat_pre
 
@@ -33,12 +34,13 @@ if __name__ == '__main__':
     model_load_path = os.path.join('..', 'results')
 
     # Files
-    u_filename = 'result-methodboosted_kmeans_approx_bfgs-dim_x2-m3-vm_typecos_mult-reg_typel2-reg_params-l2_lambda10-exclude_zero_freqTrue-clust_methodboosting-n_learner7-n_cluster2-n_iter_clust5-std_init_clust1e-02-g-2023-09-01 23-13-53'
+    u_filename = 'result-methodboosted_kmeans_approx_bfgs-dim_x2-m3-vm_typecos_mult-reg_typel2-reg_params-l2_lambda10-exclude_zero_freqTrue-clust_methodboosting-n_learner10-n_cluster2-n_iter_clust5-std_init_clust1e-02--2023-09-03 12-36-34'
     i_filename = 'result-methodboosted_kmeans_approx_bfgs-dim_x2-m4-vm_typecos_mult-reg_typel2-reg_params-l2_lambda10-exclude_zero_freqTrue-clust_methodboosting-n_learner10-n_cluster2-n_iter_clust5-std_init_clust1e-02--2023-09-01 23-26-39'
 
     # Dataset
     min_value = 1
     max_value = 5
+    truncate_ui = False
 
     # Other
     u_sett = {
@@ -72,7 +74,8 @@ if __name__ == '__main__':
         a_mat=u_ext_dic['a_mat'],
         settings=u_sett,
         min_val=min_value,
-        max_val=max_value
+        max_val=max_value,
+        truncate=truncate_ui
     )
 
     i_rating_mat_pr = fit_vm_and_predict(
@@ -80,12 +83,12 @@ if __name__ == '__main__':
         a_mat=i_ext_dic['a_mat'],
         settings=i_sett,
         min_val=min_value,
-        max_val=max_value
+        max_val=max_value,
+        truncate=truncate_ui
     ).T
 
     # ------- Combine predictions -------
     reg = LinearRegression()
-    # reg = LogisticRegression()
 
     # Fitting
     mask_va = ~np.isnan(rating_mat_va)
@@ -94,9 +97,6 @@ if __name__ == '__main__':
                            i_rating_mat_pr[mask_va].reshape((-1, 1))), axis=1)
     y_va = rating_mat_va[mask_va]
 
-    # c = 10
-    # X_va = np.arctanh((X_va - (max_value + min_value)/2)/(max_value - min_value))/c
-    # y_va = np.arctanh((y_va - (max_value + min_value)/2)/(max_value - min_value))/c
     reg.fit(X_va, y_va)
 
     # Prediction
@@ -106,10 +106,7 @@ if __name__ == '__main__':
                            i_rating_mat_pr[mask_te].reshape((-1, 1))), axis=1)
     y_te = rating_mat_te[mask_te]
 
-    # X_te = np.arctanh((X_te - (max_value + min_value)/2)/(max_value - min_value))/c
-
     y_pr = reg.predict(X_te)
-    # y_pr = np.tanh(y_pr*c)*(max_value - min_value) + (max_value + min_value)/2
 
     y_pr[y_pr > max_value] = max_value
     y_pr[y_pr < min_value] = min_value

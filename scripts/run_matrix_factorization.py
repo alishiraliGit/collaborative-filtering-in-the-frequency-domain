@@ -15,13 +15,13 @@ def get_als_settings():
     sett['method'] = method
 
     # Hidden dim
-    sett['dim'] = 100
+    sett['dim'] = 20
 
     # Weight init. std
     sett['w_init_std'] = 0.1
 
     # Regularization coefficients
-    sett['l2_lambda'] = 10
+    sett['l2_lambda'] = 1
 
     return sett
 
@@ -34,23 +34,24 @@ if __name__ == '__main__':
     settings = get_als_settings()
 
     # General
-    do_plot = True
+    do_plot = False
+    do_save = False
     random_seed = 1
     rng = default_rng(random_seed)
 
     # Path
-    load_path = os.path.join('..', 'data', 'yahoo-r3')
+    load_path = os.path.join('..', 'data', 'coat')
 
     save_path = os.path.join('..', 'results')
     os.makedirs(save_path, exist_ok=True)
 
     # Dataset
-    dataset_name = 'yahoo-r3'
-    # part = 5
+    dataset_name = 'coat'
+    part = np.nan
 
     # Cross-validation
-    test_split = 0.1
-    val_split = 0.05
+    test_split = np.nan
+    val_split = 0.1
 
     # Item-based or user-based
     do_transpose = False
@@ -100,12 +101,13 @@ if __name__ == '__main__':
           (best_iter + 1, logger.rmse_tr[best_iter], logger.rmse_va[best_iter], logger.rmse_te[best_iter]))
 
     # ------- Save the results -------
-    logger.save(ext={
-        'w_u': mf.als.w_u,
-        'w_i': mf.als.w_i,
-        'b_u': mf.als.b_u,
-        'b_i': mf.als.b_i,
-        'rating_mat_tr': rating_mat_tr,
-        'rating_mat_va': rating_mat_va,
-        'rating_mat_te': rating_mat_te
-    })
+    if do_save:
+        logger.save(ext={
+            'w_u': mf.als.w_u,
+            'w_i': mf.als.w_i,
+            'b_u': mf.als.b_u,
+            'b_i': mf.als.b_i,
+            'rating_mat_tr': rating_mat_tr,
+            'rating_mat_va': rating_mat_va,
+            'rating_mat_te': rating_mat_te
+        })
