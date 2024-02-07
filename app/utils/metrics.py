@@ -44,6 +44,6 @@ def ndcg(rat_mat_pr: np.ndarray, rat_mat_te: np.ndarray, msk: np.ndarray, k):
         rat_u_pr = rat_mat_pr[u][msk[u]]
         rat_u_te = rat_mat_te[u][msk[u]]
 
-        scores.append(ndcg_score(rat_u_te.reshape((1, -1)), rat_u_pr.reshape((1, -1)), k))
+        scores.append(ndcg_score(rat_u_te.reshape((1, -1)), rat_u_pr.reshape((1, -1)), k=k))
 
     return np.mean(scores)
