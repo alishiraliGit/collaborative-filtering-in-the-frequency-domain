@@ -132,15 +132,15 @@ def get_boosted_kmeans_approx_bfgs_settings():
 
     # --- Vandermonde settings ---
     sett['dim_x'] = 3
-    sett['m'] = 7
+    sett['m'] = 5
     sett['vm_type'] = VandermondeType.COS_MULT
     # Reg.
     sett['reg_type'] = RegularizationType.L2
-    sett['reg_params'] = {'l2_lambda': 30, 'exclude_zero_freq': True}
+    sett['reg_params'] = {'l2_lambda': 0, 'exclude_zero_freq': True}
 
     # --- Clustering settings ---
     sett['clust_method'] = 'boosting'
-    sett['n_learner'] = 10
+    sett['n_learner'] = 15
     sett['n_cluster'] = 2  # Default: 2
     sett['n_iter_clust'] = 5  # Default: 5
     sett['std_init_clust'] = 1e-2  # Default: 1e-2
@@ -244,7 +244,7 @@ if __name__ == '__main__':
 
     # General
     do_plot = False
-    do_save = False
+    do_save = True
     random_seed = 1
     rng = default_rng(random_seed)
 
@@ -252,18 +252,18 @@ if __name__ == '__main__':
     do_transpose = False
 
     # Alternation
-    n_alter = 10
+    n_alter = 15
 
     # Dataset
-    dataset_name = 'ml-100k'
-    dataset_part = 3
+    dataset_name = 'ml-1m'
+    dataset_part = np.nan
 
     # Cross-validation
-    test_split = 0.2
+    test_split = 0.1
     val_split = 0.05
 
     # Path
-    load_path = os.path.join('..', 'data', 'ml-100k')
+    load_path = os.path.join('..', 'data', 'ml-1m')
 
     save_path = os.path.join('..', 'results')
     os.makedirs(save_path, exist_ok=True)

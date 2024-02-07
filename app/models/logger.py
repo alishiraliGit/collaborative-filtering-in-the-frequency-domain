@@ -44,6 +44,8 @@ class Logger:
                          'rmse_te': self.rmse_te,
                          'settings': self.settings}, f)
 
+            print('saved at:\n' + file_name)
+
         if ext is not None:
             with open(os.path.join(self.save_path, file_name + '.extres'), 'wb') as f:
                 pickle.dump(ext, f)
